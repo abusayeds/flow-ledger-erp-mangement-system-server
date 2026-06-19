@@ -1,7 +1,0 @@
-{
-  "watch": ["src"],
-  "ext": "ts,json",
-  "env": {
-    "PORT": "2002"
-  }
-}
