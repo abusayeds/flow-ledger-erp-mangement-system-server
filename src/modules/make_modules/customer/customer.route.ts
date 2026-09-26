@@ -17,6 +17,13 @@ router.get(
   authMiddleware(role.company),
   customerController.allCustomer
 );
+
+router.get(
+  "/invoice-list",
+  authMiddleware(role.company),
+  customerController.invoiceCustomerList
+);
+
 router.get(
   "/single/:id",
   authMiddleware(role.company),
@@ -33,5 +40,11 @@ router.post(
   customerController.updateCustomer
 );
 
+
+router.post(
+  "/merge",
+  authMiddleware(role.company),
+  customerController.mergeCustomers
+);
 
 export const customerRoutes = router;

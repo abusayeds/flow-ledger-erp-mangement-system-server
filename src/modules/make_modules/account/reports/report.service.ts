@@ -1,5 +1,5 @@
 import { UserModel } from "../../../basic_modules/user/user.model";
-import { role } from "../../../../utils/role";
+import { role, CUSTOMER_ROLE_SET, VENDOR_ROLE_SET } from "../../../../utils/role";
 import { partyBaseFilter } from "../../../../utils/partyUser";
 import { companyObjectId } from "../account.utils";
 import { InvoiceModel } from "../../invoice/invoice.model";
@@ -8,6 +8,12 @@ import { CreditNoteModel } from "../../creditNote/creditNote.model";
 import { DebitNoteModel } from "../../debitNote/debitNote.model";
 import { CustomerPaymentModel } from "../customerPayment/customerPayment.model";
 import { VendorPaymentModel } from "../vendorPayment/vendorPayment.model";
+import { BillModel } from "../../bill/bill.model";
+import { ExpensesModel } from "../../expenses/expenses.model";
+import { EstimateModel } from "../../estimate/estimate.model";
+import { ProformaInvoiceModel } from "../../proformaInvoice/proformaInvoice.model";
+import { TimeLogModel } from "../../timeLog/timeLog.model";
+import { ProductModel } from "../../product/product.model";
 
 const AGING_STATUSES = ["Open", "Partial", "Overdue"];
 const BALANCE_STATUSES = ["Open", "Partial", "Paid", "Overdue"];
@@ -16,16 +22,16 @@ const BALANCE_STATUSES = ["Open", "Partial", "Paid", "Overdue"];
 const PI_AGING_STATUSES = ["posted", "partial", "overdue"];
 const PI_BALANCE_STATUSES = ["posted", "partial", "paid", "overdue"];
 
-/** Outstanding balance of a purchase invoice (uses total_amount, not total). */
+/** Outstanding balance of a purchase invoice. */
 const resolvePIBalance = (doc: {
-  total_amount?: number;
+  total?: number;
   paid_amount?: number;
   balance_amount?: number;
 }) => {
   if (doc.balance_amount !== undefined && doc.balance_amount !== null) {
     return doc.balance_amount;
   }
-  return (doc.total_amount ?? 0) - (doc.paid_amount ?? 0);
+  return (doc.total ?? 0) - (doc.paid_amount ?? 0);
 };
 
 type AgingBucket = "current" | "1_30_days" | "31_60_days" | "61_90_days" | "over_90_days";
@@ -190,7 +196,7 @@ const taxSummaryDB = async (userId: string, fromDate: string, toDate: string) =>
     user_id: companyObjectId(userId),
     isDeleted: false,
     status: { $in: PI_BALANCE_STATUSES },
-    invoice_date: { $gte: from, $lte: to },
+    date: { $gte: from, $lte: to },
   };
 
   const [collectedAgg, paidAgg] = await Promise.all([
@@ -200,7 +206,7 @@ const taxSummaryDB = async (userId: string, fromDate: string, toDate: string) =>
     ]),
     PurchaseInvoiceModel.aggregate([
       { $match: billMatch },
-      { $group: { _id: null, total: { $sum: "$tax_amount" } } },
+      { $group: { _id: null, total: { $sum: "$tax" } } },
     ]),
   ]);
 
@@ -313,10 +319,10 @@ const vendorBalanceDB = async (
       vendor_id: vendor._id,
       isDeleted: false,
       status: { $in: PI_BALANCE_STATUSES },
-      invoice_date: { $lte: asOf },
+      date: { $lte: asOf },
     }).lean();
 
-    const billed = bills.reduce((s, b) => s + (b.total_amount ?? 0), 0);
+    const billed = bills.reduce((s, b) => s + (b.total ?? 0), 0);
     const balance = bills.reduce((s, b) => s + resolvePIBalance(b), 0);
     const paid = billed - balance;
 
@@ -349,7 +355,7 @@ const customerDetailDB = async (
   const customer = await UserModel.findOne({
     _id: customerId,
     companyId: companyObjectId(userId),
-    role: role.customer,
+    role: { $in: [...CUSTOMER_ROLE_SET] },
     isDeleted: false,
   })
     .select("_id name email")
@@ -466,7 +472,7 @@ const vendorDetailDB = async (
   const vendor = await UserModel.findOne({
     _id: vendorId,
     companyId: companyObjectId(userId),
-    role: role.vendor,
+    role: { $in: [...VENDOR_ROLE_SET] },
     isDeleted: false,
   })
     .select("_id name email")
@@ -482,15 +488,15 @@ const vendorDetailDB = async (
     isDeleted: false,
     status: { $in: PI_BALANCE_STATUSES },
   };
-  if (startDate) billFilter.invoice_date = { $gte: new Date(startDate) };
+  if (startDate) billFilter.date = { $gte: new Date(startDate) };
   if (endDate)
-    billFilter.invoice_date = { ...(billFilter.invoice_date as object), $lte: new Date(endDate) };
+    billFilter.date = { ...(billFilter.date as object), $lte: new Date(endDate) };
 
   const bills = await PurchaseInvoiceModel.find(billFilter)
     .select(
-      "invoice_number invoice_date due_date subtotal tax_amount total_amount balance_amount status paid_amount"
+      "invoice_number date due_date sub_total tax total balance_amount status paid_amount"
     )
-    .sort({ invoice_date: -1 })
+    .sort({ date: -1 })
     .lean();
 
   const dnFilter: Record<string, unknown> = {
@@ -540,11 +546,11 @@ const vendorDetailDB = async (
     date_range: { start_date: startDate ?? null, end_date: endDate ?? null },
     invoices: bills.map((b) => ({
       invoice_number: b.invoice_number,
-      date: b.invoice_date,
+      date: b.date,
       due_date: b.due_date,
-      subtotal: b.subtotal,
-      tax_amount: b.tax_amount,
-      total_amount: b.total_amount,
+      subtotal: b.sub_total,
+      tax_amount: b.tax,
+      total_amount: b.total,
       balance_amount: resolvePIBalance(b),
       status: b.status,
     })),
@@ -559,13 +565,218 @@ const vendorDetailDB = async (
     })),
     payments: paymentsMapped,
     summary: {
-      total_invoiced: bills.reduce((s, b) => s + (b.total_amount ?? 0), 0),
+      total_invoiced: bills.reduce((s, b) => s + (b.total ?? 0), 0),
       total_returns: 0,
       total_debit_notes: debitNotes.reduce((s, d) => s + (d.total ?? 0), 0),
       total_payments: payments.reduce((s, p) => s + (p.payment_amount ?? 0), 0),
       balance: bills.reduce((s, b) => s + resolvePIBalance(b), 0),
     },
   };
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Company-wide financial summary for the Summary Report screen. Every figure is
+// summed defensively so a missing model/field yields 0 rather than a 500.
+const summaryDB = async (userId: string) => {
+  const uid = companyObjectId(userId);
+  const now = new Date();
+
+  const sumOf = async (Model: any, field: string, extra: any = {}) => {
+    try {
+      const r = await Model.aggregate([
+        { $match: { user_id: uid, ...extra } },
+        { $group: { _id: null, s: { $sum: `$${field}` } } },
+      ]);
+      return r[0]?.s || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const groupTop = async (Model: any, nameField: string, valueField: string) => {
+    try {
+      const rows = await Model.aggregate([
+        { $match: { user_id: uid } },
+        { $group: { _id: `$${nameField}`, value: { $sum: `$${valueField}` } } },
+        { $sort: { value: -1 } },
+        { $limit: 5 },
+      ]);
+      return rows
+        .filter((x: any) => x._id)
+        .map((x: any) => ({ name: String(x._id), value: x.value || 0 }));
+    } catch {
+      return [];
+    }
+  };
+
+  const [
+    sales, outstanding, overdue, bills, expenses, estimates, proforma,
+    creditNotes, debitNotes, paymentReceived, purchaseOrders,
+    salesTax, salesDiscount, salesSubTotal, timeLogHours,
+  ] = await Promise.all([
+    sumOf(InvoiceModel, "total"),
+    sumOf(InvoiceModel, "balance_amount"),
+    sumOf(InvoiceModel, "balance_amount", { due_date: { $lt: now } }),
+    sumOf(BillModel, "total"),
+    sumOf(ExpensesModel, "total"),
+    sumOf(EstimateModel, "total"),
+    sumOf(ProformaInvoiceModel, "total"),
+    sumOf(CreditNoteModel, "total"),
+    sumOf(DebitNoteModel, "total"),
+    sumOf(CustomerPaymentModel, "payment_amount"),
+    sumOf(PurchaseInvoiceModel, "total"),
+    sumOf(InvoiceModel, "tax"),
+    sumOf(InvoiceModel, "discount"),
+    sumOf(InvoiceModel, "sub_total"),
+    sumOf(TimeLogModel, "hours"),
+  ]);
+
+  const [topCustomers, topVendors] = await Promise.all([
+    groupTop(InvoiceModel, "customer_name", "total"),
+    groupTop(BillModel, "vendor_name", "total"),
+  ]);
+
+  return {
+    summary: {
+      outstanding,
+      net_profit: sales - expenses,
+      sales,
+      bills,
+      payment_received: paymentReceived,
+      proforma_invoice: proforma,
+      estimates,
+      expenses,
+      purchase_order: purchaseOrders,
+      overdue,
+      credit_notes: creditNotes,
+      debit_notes: debitNotes,
+      time_logs: timeLogHours,
+    },
+    top_customers: topCustomers,
+    top_vendors: topVendors,
+    sales_breakdown: {
+      total: sales,
+      discount: salesDiscount,
+      net_sales: sales - salesDiscount,
+      tax: salesTax,
+      gross_sales: salesSubTotal,
+    },
+    payment_received_breakdown: [{ name: "Total", value: paymentReceived }],
+  };
+};
+
+/**
+ * Generic document-list report. Returns pre-shaped `{ columns, rows }` so the
+ * client can render any of these reports without per-type mapping.
+ */
+const listReportDB = async (userId: string, type: string) => {
+  const uid = companyObjectId(userId);
+  const scope = { user_id: uid, isDeleted: { $ne: true } };
+  const money = (n: unknown) => Number(n ?? 0);
+  const dateStr = (d: unknown) =>
+    d ? new Date(d as Date).toISOString().slice(0, 10) : "";
+
+  // Sales-style docs: number / party / date / total / status.
+  const docReport = async (
+    Model: any,
+    partyField: "customer_name" | "vendor_name",
+    partyLabel: string,
+    title: string
+  ) => {
+    const rows = await Model.find(scope)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+    return {
+      title,
+      columns: [
+        { id: "number", label: "Number" },
+        { id: "party", label: partyLabel },
+        { id: "date", label: "Date" },
+        { id: "total", label: "Total" },
+        { id: "status", label: "Status" },
+      ],
+      rows: rows.map((r: any) => ({
+        number: r.invoice_number ?? r.po ?? "",
+        party: r[partyField] ?? "",
+        date: dateStr(r.date ?? r.createdAt),
+        total: money(r.total),
+        status: r.status ?? "",
+      })),
+    };
+  };
+
+  switch (type) {
+    case "sales":
+      return docReport(InvoiceModel, "customer_name", "Customer", "Sales Report");
+    case "estimate":
+      return docReport(EstimateModel, "customer_name", "Customer", "Estimate Report");
+    case "bill":
+      return docReport(BillModel, "vendor_name", "Vendor", "Bill Report");
+    case "purchase_order":
+      return docReport(PurchaseInvoiceModel, "vendor_name", "Vendor", "Purchase Order Report");
+    case "expense": {
+      const rows = await ExpensesModel.find(scope).sort({ createdAt: -1 }).limit(500).lean();
+      return {
+        title: "Expense Report",
+        columns: [
+          { id: "number", label: "Number" },
+          { id: "category", label: "Category" },
+          { id: "date", label: "Date" },
+          { id: "total", label: "Total" },
+        ],
+        rows: rows.map((r: any) => ({
+          number: r.invoice_number ?? "",
+          category: r.category ?? "",
+          date: dateStr(r.date ?? r.createdAt),
+          total: money(r.total),
+        })),
+      };
+    }
+    case "payment":
+    case "payment_made": {
+      const Model: any = type === "payment" ? CustomerPaymentModel : VendorPaymentModel;
+      const rows = await Model.find(scope).sort({ createdAt: -1 }).limit(500).lean();
+      return {
+        title: type === "payment" ? "Payment Report" : "Payment Made",
+        columns: [
+          { id: "number", label: "Number" },
+          { id: "reference", label: "Reference" },
+          { id: "date", label: "Date" },
+          { id: "amount", label: "Amount" },
+        ],
+        rows: rows.map((r: any) => ({
+          number: r.payment_number ?? "",
+          reference: r.reference_number ?? "",
+          date: dateStr(r.payment_date ?? r.createdAt),
+          amount: money(r.payment_amount),
+        })),
+      };
+    }
+    case "stock": {
+      const rows = await ProductModel.find({ user_id: uid, isDeleted: { $ne: true } })
+        .sort({ createdAt: -1 })
+        .limit(1000)
+        .lean();
+      return {
+        title: "Stock Report",
+        columns: [
+          { id: "product", label: "Product" },
+          { id: "quantity", label: "Quantity" },
+          { id: "buy_price", label: "Buy Price" },
+          { id: "sell_price", label: "Sell Price" },
+        ],
+        rows: rows.map((r: any) => ({
+          product: r.productName ?? "",
+          quantity: money(r.stock?.quantity ?? r.quantity),
+          buy_price: money(r.pricing?.buyPrice),
+          sell_price: money(r.pricing?.sellPrice),
+        })),
+      };
+    }
+    default:
+      return { title: "Report", columns: [], rows: [] };
+  }
 };
 
 export const reportService = {
@@ -576,4 +787,6 @@ export const reportService = {
   vendorBalanceDB,
   customerDetailDB,
   vendorDetailDB,
+  summaryDB,
+  listReportDB,
 };

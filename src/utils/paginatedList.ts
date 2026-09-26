@@ -15,10 +15,7 @@ const isPaginationMeta = (value: unknown): value is PaginationMeta =>
   "currentPage" in value &&
   "totalData" in value;
 
-/**
- * Pulls `{ pagination, data: T[] }` from service payloads that nest the list under
- * keys like `user`, `rows`, `allRecords`, etc.
- */
+
 export const extractPaginatedList = <T>(
   payload: Record<string, unknown>
 ): PaginatedListResult<T> | null => {

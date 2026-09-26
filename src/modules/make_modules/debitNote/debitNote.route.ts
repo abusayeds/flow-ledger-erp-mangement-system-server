@@ -23,4 +23,10 @@ router.get(
   debitNoteController.getAll
 );
 
+router.patch(
+  '/signature/:id',
+  authMiddleware(role.company),
+  debitNoteController.updateSignature
+);
+
 export const debitNoteRoutes = router;

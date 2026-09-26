@@ -13,6 +13,15 @@ export const attendanceController = {
     const result = await attendanceService.list(req, req.query as Record<string, unknown>);
     sendHrmPaginatedList(res, "Attendances", result);
   }),
+  grid: catchAsync(async (req: AuthRequest, res) => {
+    const data = await attendanceService.grid(req, req.query as Record<string, unknown>);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Attendance grid",
+      data,
+    });
+  }),
   create: catchAsync(async (req: AuthRequest, res) => {
     const { action, data } = await attendanceService.createManual(req, req.body);
     sendResponse(res, {

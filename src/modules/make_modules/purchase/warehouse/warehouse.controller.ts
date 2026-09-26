@@ -56,10 +56,21 @@ const deleteWarehouse = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
+const restoreWarehouse = catchAsync(async (req: AuthRequest, res) => {
+  const result = await warehouseService.restoreWarehouseDB(req.params.id, req?.user?._id as string);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Warehouse restored successfully",
+    data: result,
+  });
+});
+
 export const warehouseController = {
   createWarehouse,
   getAllWarehouse,
   getSingleWarehouse,
   updateWarehouse,
   deleteWarehouse,
+  restoreWarehouse,
 };

@@ -26,6 +26,9 @@ export type TCompanySubscription = {
   end_date?: Date | null; // null = never expires
   is_trial: boolean;
   status: TCompanySubscriptionStatus;
+  /** When false, the plan will not renew after end_date. Access lasts until end_date. */
+  auto_renew?: boolean;
+  cancelled_at?: Date | null;
 
   createdAt?: Date;
   updatedAt?: Date;

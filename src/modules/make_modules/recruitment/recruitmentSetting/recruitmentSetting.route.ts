@@ -9,6 +9,9 @@ const router = express.Router();
 const auth = authMiddleware(role.company, role.hr);
 const P = permission.recruitment.setting;
 
+router.get("/brand-settings", auth, permissionMiddleware(P.manage_recruitment_brand_settings), C.brandSettingsGet);
+router.post("/brand-settings", auth, permissionMiddleware(P.manage_recruitment_brand_settings), C.brandSettingsUpdate);
+
 router.get("/about-company", auth, permissionMiddleware(P.manage_about_company), C.aboutCompanyGet);
 router.post("/about-company", auth, permissionMiddleware(P.manage_about_company), C.aboutCompanyUpdate);
 

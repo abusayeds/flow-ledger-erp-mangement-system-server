@@ -8,7 +8,7 @@ export const updateBankBalance = async (
   delta: number
 ) => {
   await BankAccountModel.findByIdAndUpdate(bankAccountId, {
-    $inc: { current_balance: delta },
+    $inc: { current_balance: delta }
   });
 };
 

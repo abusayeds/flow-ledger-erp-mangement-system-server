@@ -88,6 +88,24 @@ export const getAllLedgerEntries = async (
     { $sort: { journal_date: -1, _id: -1 } }
   );
 
+  // Free-text search across the projected fields, applied to the FULL result
+  // set (before the in-memory pagination below) so it spans the whole ledger.
+  const searchTerm =
+    typeof query.searchTerm === "string" ? query.searchTerm.trim() : "";
+  if (searchTerm) {
+    pipeline.push({
+      $match: {
+        $or: [
+          "account_name",
+          "account_code",
+          "description",
+          "journal_description",
+          "reference_type",
+        ].map((f) => ({ [f]: { $regex: searchTerm, $options: "i" } })),
+      },
+    });
+  }
+
   const allRows = await JournalEntryItemModel.aggregate(pipeline);
 
   const page = Number(query.page) || 1;

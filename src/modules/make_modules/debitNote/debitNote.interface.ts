@@ -7,6 +7,7 @@ export type TDebitNote = {
   _id?: Types.ObjectId;
   user_id: Types.ObjectId;
   vendor_id?: Types.ObjectId;
+  vendor_name?: string;
   source?: "manual" | "return";
   return_id?: Types.ObjectId;
   source_invoice_id?: Types.ObjectId;
@@ -38,7 +39,9 @@ export type TDebitNote = {
   };
   product?: [
     {
-      product_id: Types.ObjectId;
+      product_id?: Types.ObjectId;
+      product_name?: string;
+      description?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -48,7 +51,8 @@ export type TDebitNote = {
   ];
   service?: [
     {
-      service_id: Types.ObjectId;
+      service_id?: Types.ObjectId;
+      service_name?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -60,17 +64,22 @@ export type TDebitNote = {
   terms_and_conditions?: string;
   notes?: string;
   internal_notes?: string;
+  /** Uploaded file path from POST /api/v1/upload. */
+  attachments?: string;
   Attachment?: string;
+  /** Server-relative path to the captured vendor signature image. */
+  signature?: string;
   sub_total: number;
   deposit: number | string;
   discount: number | string;
   shipping_cost: number | string;
   inline_discount: number;
   tax: number;
+  tax_breakdown?: { name: string; rate: number; base: number; amount: number }[];
   total: number;
   applied_amount?: number;
   balance_amount?: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

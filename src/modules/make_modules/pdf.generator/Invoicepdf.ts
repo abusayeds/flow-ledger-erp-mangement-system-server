@@ -1,4 +1,59 @@
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
+
+/** Load an image (signature/attachment) into a Buffer for `doc.image`.
+ * Handles data: URIs and uploaded files served from `public/` (e.g. a stored
+ * "/files/xyz.png"). Returns null when the source is missing/unreadable. */
+const loadSignatureBuffer = (src: any): Buffer | null => {
+  if (!src || typeof src !== "string") return null;
+  try {
+    if (src.startsWith("data:")) return Buffer.from(src.split(",")[1], "base64");
+    // Uploaded files live under public/ and are served at the same path.
+    if (src.startsWith("/")) {
+      const abs = path.join(process.cwd(), "public", src);
+      return fs.existsSync(abs) ? fs.readFileSync(abs) : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+// ─── Amount → words (currency-aware) ─────────────────────────────────────────
+const _ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const _TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const _chunk = (x: number): string =>
+  x === 0 ? "" :
+  x < 20 ? _ONES[x] :
+  x < 100 ? `${_TENS[Math.floor(x / 10)]}${x % 10 ? " " + _ONES[x % 10] : ""}` :
+  `${_ONES[Math.floor(x / 100)]} Hundred${x % 100 ? " " + _chunk(x % 100) : ""}`;
+const _intWords = (n: number): string => {
+  if (n === 0) return "Zero";
+  const scales: [number, string][] = [[1e9, "Billion"], [1e6, "Million"], [1e3, "Thousand"], [1, ""]];
+  let rest = Math.floor(n);
+  const parts: string[] = [];
+  for (const [v, name] of scales) {
+    const q = Math.floor(rest / v);
+    if (q) { parts.push(`${_chunk(q)}${name ? " " + name : ""}`); rest %= v; }
+  }
+  return parts.join(" ") || "Zero";
+};
+const _CURRENCY_UNITS: Record<string, [string, string]> = {
+  BDT: ["Takas", "Paisas"], USD: ["Dollars", "Cents"], EUR: ["Euros", "Cents"],
+  GBP: ["Pounds", "Pence"], INR: ["Rupees", "Paise"], AUD: ["Dollars", "Cents"],
+  CAD: ["Dollars", "Cents"], PKR: ["Rupees", "Paisas"], AED: ["Dirhams", "Fils"],
+};
+/** e.g. amountToWords(6201.52, "BDT") -> "Six Thousand Two Hundred One Takas and Fifty Two Paisas". */
+const amountToWords = (amount: number, currency: string): string => {
+  const cur = (currency || "USD").toUpperCase();
+  const [major, minor] = _CURRENCY_UNITS[cur] || [cur, "Cents"];
+  const abs = Math.abs(Number(amount) || 0);
+  const whole = Math.floor(abs);
+  const frac = Math.round((abs - whole) * 100);
+  const words = `${_intWords(whole)} ${major}`;
+  return frac > 0 ? `${words} and ${_intWords(frac)} ${minor}` : words;
+};
 
 // ─── Color Helper ────────────────────────────────────────────────────────────
 const hexToRgb = (hex: any): [number, number, number] => {
@@ -30,8 +85,12 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
   const textColor     = style.text_color      || "#000000";
 
   // ── Font size ────────────────────────────────────────────────────────────
-  const fontSizeMap: any = { small: 7, normal: 8, large: 9 };
-  const baseFontSize     = fontSizeMap[style.font_size] || 8;
+  const fontSizeMap: any = { small: 7, normal: 8, medium: 8, large: 9, big: 9 };
+  const baseFontSize = (typeof style.font_size === "number"
+    ? style.font_size
+    : (String(style.font_size ?? "").trim() !== "" && !isNaN(Number(style.font_size))
+        ? Number(style.font_size)
+        : fontSizeMap[style.font_size])) || 8;
 
   // ── Page metrics ─────────────────────────────────────────────────────────
   const margin    = style.margin || { top: 30, right: 30, bottom: 30, left: 30 };
@@ -90,7 +149,7 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
     if (footer.created_moon_invoice_hyperlink !== false) {
       setFont(false, 7);
       doc.fillColor(rgb("#999999")).text(
-        "Created by mooninvoice",
+        "Created by Qayd",
         margin.left,
         PAGE_H - margin.bottom - 12,
         { width: CONTENT_W, align: "center" }
@@ -264,6 +323,28 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
     });
 
     rightY += detailRows.length * rowH + 5;
+
+    // Accepted payment methods, right-aligned under the meta table (reference
+    // layout: "We accept payment by" + the method logos in the header).
+    if (Array.isArray(data.paymentMethods) && data.paymentMethods.length) {
+      drawText("We accept payment by", boxX, rightY + 2, {
+        width: boxW, align: "right", color: "#666666", size: baseFontSize - 1,
+      });
+      let py = rightY + 14;
+      let px = boxX;
+      const logoSz = 18;
+      const gap = 4;
+      data.paymentMethods.forEach((m: any) => {
+        if (px + logoSz > boxX + boxW) { px = boxX; py += logoSz + gap; }
+        const buf = loadSignatureBuffer(m.logo);
+        if (buf) {
+          try { doc.image(buf, px, py, { fit: [logoSz, logoSz] }); } catch { /* skip */ }
+        }
+        px += logoSz + gap;
+      });
+      rightY = py + logoSz + 6;
+    }
+
     y = Math.max(leftY, rightY) + 10;
   }
 
@@ -299,8 +380,8 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
   // ════════════════════════════════════════════════════════════════════════
   // SECTION 3 — SUBTITLE
   // ════════════════════════════════════════════════════════════════════════
-  if (header.sub_title !== false) {
-    drawText("Moon Invoice - Easy Invoicing", margin.left, y, {
+  if (header.sub_title !== false && data.subTitle) {
+    drawText(data.subTitle, margin.left, y, {
       bold: true, align: header.sub_title_alignment || "center",
       size: baseFontSize + 1, width: CONTENT_W,
     });
@@ -312,72 +393,96 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
   // ════════════════════════════════════════════════════════════════════════
   const drawProdHeader = () => { y = drawTableHeader(prodCols, tableX, y, 16); };
 
-  checkPageBreak(32);
-  drawProdHeader();
+  // Only render the Products section when there ARE products — otherwise a
+  // services-only document showed an empty "Products" table header.
+  if (data.products.length > 0) {
+    checkPageBreak(32);
+    drawProdHeader();
 
-  data.products.forEach((prod: any, i: number) => {
-    const totalH = 14 + (prod.description ? 18 : 0);
-    checkPageBreak(totalH, drawProdHeader);
+    data.products.forEach((prod: any, i: number) => {
+      const totalH = 14 + (prod.description ? 18 : 0);
+      checkPageBreak(totalH, drawProdHeader);
 
-    y = drawTableRow(
-      prodCols.map((col: any) =>
-        col.key === "name"
-          ? { value: prod.name, w: col.w, align: "left" }
-          : { value: prod[col.key], w: col.w }
-      ),
-      tableX, y, 14, i
-    );
+      y = drawTableRow(
+        prodCols.map((col: any) =>
+          col.key === "name"
+            ? { value: prod.name, w: col.w, align: "left" }
+            : { value: prod[col.key], w: col.w }
+        ),
+        tableX, y, 14, i
+      );
 
-    if (prod.description) {
-      checkPageBreak(18, drawProdHeader);
-      drawDescRow(prod.description, i, tableX);
-    }
-  });
+      if (prod.description) {
+        checkPageBreak(18, drawProdHeader);
+        drawDescRow(prod.description, i, tableX);
+      }
+    });
 
-  y += 6;
+    y += 6;
+  }
 
   // ════════════════════════════════════════════════════════════════════════
   // SECTION 5 — SERVICES TABLE
   // ════════════════════════════════════════════════════════════════════════
   const drawSvcHeader = () => { y = drawTableHeader(svcCols, tableX, y, 16); };
 
-  checkPageBreak(32);
-  drawSvcHeader();
+  // Only render the Services section when there ARE services — a products-only
+  // document must not show an empty "Services" table.
+  if (data.services.length > 0) {
+    checkPageBreak(32);
+    drawSvcHeader();
 
-  data.services.forEach((svc: any, i: number) => {
-    const totalH = 14 + (svc.description ? 18 : 0);
-    checkPageBreak(totalH, drawSvcHeader);
+    data.services.forEach((svc: any, i: number) => {
+      const totalH = 14 + (svc.description ? 18 : 0);
+      checkPageBreak(totalH, drawSvcHeader);
 
-    y = drawTableRow(
-      svcCols.map((col: any) =>
-        col.key === "name"
-          ? { value: svc.name, w: col.w, align: "left" }
-          : { value: svc[col.key], w: col.w }
-      ),
-      tableX, y, 14, i
-    );
+      y = drawTableRow(
+        svcCols.map((col: any) =>
+          col.key === "name"
+            ? { value: svc.name, w: col.w, align: "left" }
+            : { value: svc[col.key], w: col.w }
+        ),
+        tableX, y, 14, i
+      );
 
-    if (svc.description) {
-      checkPageBreak(18, drawSvcHeader);
-      drawDescRow(svc.description, i, tableX);
-    }
-  });
+      if (svc.description) {
+        checkPageBreak(18, drawSvcHeader);
+        drawDescRow(svc.description, i, tableX);
+      }
+    });
 
-  y += 10;
+    y += 10;
+  }
 
   // ════════════════════════════════════════════════════════════════════════
   // SECTION 6 — TERMS & SUMMARY
   // ════════════════════════════════════════════════════════════════════════
+  // Currency label for the totals block — must match the doc's currency (used
+  // by the header & line items), not a hardcoded "USD".
+  const cur = data.currency || "USD";
+  const sm = data.summary;
+  // Percent for the label (JS already trims: 1 → "1", 8.5 → "8.5", 20 → "20").
+  const pct = (v: number) => `${v}`;
   const sumRows: any[] = [];
-  if (summary.sub_total       !== false) sumRows.push(["Sub Total",       `${data.summary.subTotal.toFixed(2)} USD`]);
-  if (summary.discount        !== false) sumRows.push(["Discount (10%)",  `${data.summary.discount.toFixed(2)} USD`]);
-  if (summary.inline_discount !== false) sumRows.push(["Inline Discount", `${data.summary.inlineDiscount.toFixed(2)} USD`]);
-  if (summary.shipping_cost   !== false) sumRows.push(["Shipping Cost",   `${data.summary.shippingCost.toFixed(2)} USD`]);
-  sumRows.push(["GST 9% on 5%", `${data.summary.gst9on5.toFixed(2)} USD`]);
-  if (summary.total           !== false) sumRows.push(["Total",           `${data.summary.total.toFixed(2)} USD`,     true]);
-  if (summary.amount_paid     !== false) sumRows.push(["Amount Paid",     `${data.summary.amountPaid.toFixed(2)} USD`]);
-  if (summary.return_order    !== false) sumRows.push(["Return Order",    `${data.summary.returnOrder.toFixed(2)} USD`]);
-  if (summary.amount_due      !== false) sumRows.push(["Amount Due",      `${data.summary.amountDue.toFixed(2)} USD`,  true]);
+  if (summary.sub_total       !== false) sumRows.push(["Sub Total",       `${sm.subTotal.toFixed(2)} ${cur}`]);
+  if (summary.deposit         !== false && sm.deposit > 0) sumRows.push(["Deposit", `${sm.deposit.toFixed(2)} ${cur}`]);
+  if (summary.discount        !== false && sm.discountAmount > 0) sumRows.push([`Discount ${pct(sm.discountPercent)}% on ${sm.subTotal.toFixed(2)}`, `${sm.discountAmount.toFixed(2)} ${cur}`]);
+  if (summary.inline_discount !== false && sm.inlineDiscount > 0) sumRows.push(["Inline Discount", `${sm.inlineDiscount.toFixed(2)} ${cur}`]);
+  if (summary.shipping_cost   !== false && sm.shippingCost > 0) sumRows.push(["Shipping Cost",   `${sm.shippingCost.toFixed(2)} ${cur}`]);
+  // Named-tax rows ("Custom tax 20% on 771"); fall back to a single "Tax" row.
+  if (summary.tax !== false) {
+    if (Array.isArray(sm.taxBreakdown) && sm.taxBreakdown.length > 0) {
+      for (const t of sm.taxBreakdown) {
+        sumRows.push([`${t.name} ${pct(t.rate)}% on ${t.base.toFixed(2)}`, `${t.amount.toFixed(2)} ${cur}`]);
+      }
+    } else if (sm.tax > 0) {
+      sumRows.push(["Tax", `${sm.tax.toFixed(2)} ${cur}`]);
+    }
+  }
+  if (summary.total           !== false) sumRows.push(["Total",           `${sm.total.toFixed(2)} ${cur}`,     true]);
+  if (summary.amount_paid     !== false) sumRows.push(["Amount Paid",     `${sm.amountPaid.toFixed(2)} ${cur}`]);
+  if (summary.deposit         !== false && sm.deposit > 0) sumRows.push(["Deposit Due", `${sm.depositDue.toFixed(2)} ${cur}`, true]);
+  if (summary.amount_due      !== false) sumRows.push(["Amount Due",      `${sm.amountDue.toFixed(2)} ${cur}`,  true]);
 
   checkPageBreak(Math.max(80, sumRows.length * 13 + 20));
 
@@ -410,6 +515,19 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
     drawText(row[1], sumX + sumW * 0.55, sumY + 2, { bold: isBold, size: baseFontSize - 0.5, width: sumW * 0.42, align: "right" });
     sumY += rowH;
   });
+
+  // Total in Words (reference layout: under the totals, in the summary column).
+  if (summary.total_in_words !== false) {
+    sumY += 4;
+    drawText("Total in Words", sumX + 4, sumY, { bold: true, size: baseFontSize - 0.5, width: sumW - 8, align: "right" });
+    sumY += 11;
+    setFont(false, baseFontSize - 1.5);
+    doc.fillColor(rgb("#333333")).text(
+      amountToWords(sm.total, cur),
+      sumX + 4, sumY, { width: sumW - 8, align: "right", lineBreak: true },
+    );
+    sumY += 22;
+  }
 
   y = Math.max(termsY, sumY) + 15;
 
@@ -474,21 +592,60 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
   // ════════════════════════════════════════════════════════════════════════
   // SECTION 8 — SIGNATURE + QR
   // ════════════════════════════════════════════════════════════════════════
-  if (signature.company_sign !== "hide" || header.qr_code !== false) {
+  const customerSrc = data.signature?.customerImage || data.signature?.image;
+  const showCustomerSig = signature.contact_sign !== false && !!customerSrc;
+  if (signature.company_sign !== "hide" || header.qr_code !== false || showCustomerSig) {
     const qrW  = 70;
     const sigW = 130;
-    checkPageBreak(qrW + 20);
+    const sigImgH = 34;
+    // Push the whole block down so the signature image never overlaps
+    // totals / notes / payment rows above.
+    y += 28;
+    checkPageBreak(qrW + sigImgH + 50);
 
     const baseY = y;
-    const sigX  = margin.left + CONTENT_W * 0.25;
+    // Signature sits at the bottom-left (reference layout); QR stays right.
+    const sigX  = margin.left;
     const qrX   = PAGE_W - margin.right - CONTENT_W * 0.15 - qrW;
+    const lineY = baseY + sigImgH + 4;
 
     if (signature.company_sign !== "hide") {
+      // Company / Authorized Signatory — from Settings signatures, not the
+      // per-document customer signature.
+      const sigBuf = loadSignatureBuffer(data.signature?.companyImage);
+      if (sigBuf) {
+        try {
+          doc.image(sigBuf, sigX, baseY, {
+            fit: [sigW, sigImgH], align: "center",
+          });
+        } catch { /* ignore an undecodable image, keep the label */ }
+      }
       doc.save().strokeColor(rgb(borderColor))
-        .moveTo(sigX, baseY + 20).lineTo(sigX + sigW, baseY + 20)
+        .moveTo(sigX, lineY).lineTo(sigX + sigW, lineY)
         .stroke().restore();
-      drawText(data.signature.companyName, sigX, baseY + 22, { bold: true, width: sigW, align: "center" });
-      drawText(data.signature.subtitle,    sigX, baseY + 35, { width: sigW, align: "center", color: "#666666" });
+      drawText(data.signature.companyName, sigX, lineY + 3, { bold: true, width: sigW, align: "center" });
+      drawText(data.signature.subtitle,    sigX, lineY + 16, { width: sigW, align: "center", color: "#666666" });
+    }
+
+    // Optional customer signature — only when PDF setting is on AND the
+    // document actually has a captured signature image.
+    if (showCustomerSig) {
+      const custBuf = loadSignatureBuffer(customerSrc);
+      // Sit left of the QR column so both can coexist.
+      const custX = Math.max(sigX + sigW + 24, qrX - sigW - 16);
+      if (custBuf) {
+        try {
+          doc.image(custBuf, custX, baseY, {
+            fit: [sigW, sigImgH], align: "center",
+          });
+        } catch { /* ignore */ }
+      }
+      doc.save().strokeColor(rgb(borderColor))
+        .moveTo(custX, lineY).lineTo(custX + sigW, lineY)
+        .stroke().restore();
+      drawText("Customer Signature", custX, lineY + 16, {
+        width: sigW, align: "center", color: "#666666",
+      });
     }
 
     if (header.qr_code !== false) {
@@ -508,11 +665,14 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
       }
     }
 
-    y += qrW + 15;
+    y = Math.max(lineY + 30, baseY + qrW + 18);
   }
 
    // ─── PAYMENT DETAILS ─────────────────────────────────────────────────────
-  {
+  // Only when payments exist against this document (and the setting allows it),
+  // so documents with no payments don't show an empty table.
+  if (Array.isArray(data.paymentDetails) && data.paymentDetails.length > 0 &&
+      summary.payment_details !== false) {
     y += 5;
     // Title
     drawRect(tableX, y, CONTENT_W, 16, fillColor, borderColor);
@@ -521,17 +681,18 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
     y += 16;
 
     const payCols = [
-      { label: "Payment #", w: CONTENT_W * 0.18 },
-      { label: "Date",      w: CONTENT_W * 0.25 },
-      { label: "Amount",    w: CONTENT_W * 0.32 },
-      { label: "Payment Type", w: CONTENT_W * 0.25 },
+      { label: "Payment #", w: CONTENT_W * 0.20, key: "paymentNo" },
+      { label: "Date",      w: CONTENT_W * 0.18, key: "date" },
+      { label: "Method",    w: CONTENT_W * 0.20, key: "method", align: "left" as const },
+      { label: "Amount",    w: CONTENT_W * 0.24, key: "amount", align: "right" as const },
+      { label: "Status",    w: CONTENT_W * 0.18, key: "status", align: "center" as const },
     ];
 
     // Header
     let px = tableX;
     payCols.forEach((col) => {
       drawRect(px, y, col.w, 14, "#e8edf5", borderColor)
-      drawText(col.label, px + 2, y + 3, { bold: true, size: baseFontSize - 0.5, width: col.w - 4 });
+      drawText(col.label, px + 2, y + 3, { bold: true, size: baseFontSize - 0.5, width: col.w - 4, align: col.align });
       px += col.w;
     });
     y += 14;
@@ -539,18 +700,32 @@ export const generateInvoicePDF = async (data: any, settings: any, res: any) => 
     data.paymentDetails.forEach((pay: any, i: number) => {
       const rh = 14;
       const bg = i % 2 === 0 ? "#ffffff" : "#f9f9f9";
-      const vals3 = [pay.paymentNo, pay.date, pay.amount, pay.paymentType];
       let ppx = tableX;
-      payCols.forEach((col, ci) => {
+      payCols.forEach((col) => {
         drawRect(ppx, y, col.w, rh, bg, borderColor);
-        drawText(vals3[ci], ppx + 2, y + 3, { size: baseFontSize - 0.5, width: col.w - 4 });
+        drawText(pay[col.key], ppx + 2, y + 3, { size: baseFontSize - 0.5, width: col.w - 4, align: col.align });
         ppx += col.w;
       });
       y += rh;
     });
 
+    // Total Paid / Balance summary (currency-aware) under the table.
+    if (data.paymentSummary) {
+      const sumX2 = tableX + CONTENT_W * 0.55;
+      const sumW2 = CONTENT_W * 0.45;
+      const sumRow = (label: string, value: string) => {
+        drawRect(sumX2, y, sumW2, 14, "#f0f4ff", borderColor);
+        drawText(label, sumX2 + 4, y + 3, { bold: true, size: baseFontSize - 0.5, width: sumW2 * 0.5 });
+        drawText(value, sumX2 + sumW2 * 0.5, y + 3, { bold: true, size: baseFontSize - 0.5, width: sumW2 * 0.5 - 4, align: "right" });
+        y += 14;
+      };
+      sumRow("Total Paid", data.paymentSummary.totalPaid);
+      sumRow("Balance Due", data.paymentSummary.balance);
+    }
+
     y += 10;
   }
+
   // ════════════════════════════════════════════════════════════════════════
   // ✅ FIX: Decorate the LAST page before ending
   // This ensures border + footer appear on every single page,

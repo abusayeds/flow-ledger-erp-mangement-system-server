@@ -3,9 +3,10 @@ import { AuthRequest } from "../../../../middlewares/auth";
 import catchAsync from "../../../../utils/catchAsync";
 import sendResponse from "../../../../utils/sendResponse";
 import { invoiceReturnService } from "./invoiceReturn.service";
-import { Types } from "mongoose";
 import { activitiesService } from "../../activities/activities.service";
-import { ActivitiesType } from "../../activities/activities.interface";
+import { ActivityAction } from "../../activities/activities.interface";
+import { ActivityModule } from "../../../../utils/activityModules";
+import { activityActors } from "../../../../utils/activityContext";
 
 const createReturn = catchAsync(async (req: AuthRequest, res) => {
   req.body.user_id = req?.user?._id;
@@ -17,8 +18,10 @@ const createReturn = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Created,
+    ...activityActors(req),
+    module: ActivityModule.invoice_return,
+    entity_ids: [result._id!],
+    action: ActivityAction.created,
     title: "Invoice Return Created",
   });
 });
@@ -63,8 +66,10 @@ const updateReturn = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Updated,
+    ...activityActors(req),
+    module: ActivityModule.invoice_return,
+    entity_ids: [result?._id ?? req.params.id],
+    action: ActivityAction.updated,
     title: "Invoice Return Updated",
   });
 });
@@ -81,8 +86,10 @@ const deleteReturn = catchAsync(async (req: AuthRequest, res) => {
     data: null,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Archived,
+    ...activityActors(req),
+    module: ActivityModule.invoice_return,
+    entity_ids: [req.params.id],
+    action: ActivityAction.archived,
     title: "Invoice Return Deleted",
   });
 });
@@ -99,9 +106,32 @@ const approveReturn = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Updated,
+    ...activityActors(req),
+    module: ActivityModule.invoice_return,
+    entity_ids: [result.salesReturn._id],
+    action: ActivityAction.updated,
     title: "Invoice Return Approved",
+  });
+});
+
+/** Brings a soft-deleted invoice return back — the counterpart of `deleteReturn`. */
+const restoreReturn = catchAsync(async (req: AuthRequest, res) => {
+  const result = await invoiceReturnService.restoreInvoiceReturnDB(
+    req.params.id,
+    req?.user?._id as string
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Invoice Return restored successfully",
+    data: result,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.invoice_return,
+    entity_ids: [req.params.id],
+    action: ActivityAction.updated,
+    title: "Invoice Return Restored",
   });
 });
 
@@ -112,4 +142,5 @@ export const invoiceReturnController = {
   updateReturn,
   deleteReturn,
   approveReturn,
+  restoreReturn,
 };

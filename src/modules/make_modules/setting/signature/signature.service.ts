@@ -1,5 +1,6 @@
 import { TSignature } from "./signature.interface";
 import { SignatureModel } from "./signature.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const createDB = async (payload: TSignature) => {
   return await SignatureModel.create(payload);
@@ -15,19 +16,21 @@ const getSingleDB = async (id: string, user_id: string) => {
 
 const updateDB = async (id: string, payload: Partial<TSignature>, user_id: string) => {
   return await SignatureModel.findOneAndUpdate(
-    { _id: id, user_id, isDeleted: false },
+    { _id: id, user_id },
     payload,
     { new: true }
   );
 };
 
-const deleteDB = async (id: string, user_id: string) => {
+const deleteDBOne = async (id: string, user_id: string) => {
   return await SignatureModel.findOneAndUpdate(
     { _id: id, user_id, isDeleted: false },
     { isDeleted: true },
     { new: true }
   );
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const signatureService = {
   createDB,

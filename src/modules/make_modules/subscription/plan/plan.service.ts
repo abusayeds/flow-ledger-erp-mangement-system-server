@@ -5,6 +5,7 @@ import queryBuilder from "../../../../builder/queryBuilder";
 import { MODULE_KEYS } from "../subscription.constants";
 import { PlanModel } from "./plan.model";
 import { TPlan } from "./plan.interface";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toPlainLimits = (limits: any): Record<string, number> => {
@@ -83,9 +84,8 @@ const getSinglePlanDB = async (id: string) => {
 const updatePlanDB = async (id: string, payload: Record<string, unknown>) => {
   const clean = sanitize(payload);
   delete (clean as Partial<TPlan>).created_by;
-  delete (clean as Partial<TPlan>).isDeleted;
   const plan = await PlanModel.findOneAndUpdate(
-    { _id: id, isDeleted: false },
+    { _id: id },
     { $set: clean },
     { new: true, runValidators: true }
   ).lean();
@@ -93,7 +93,7 @@ const updatePlanDB = async (id: string, payload: Record<string, unknown>) => {
   return format(plan);
 };
 
-const deletePlanDB = async (id: string) => {
+const deletePlanDBOne = async (id: string) => {
   const plan = await PlanModel.findOneAndUpdate(
     { _id: id, isDeleted: false },
     { isDeleted: true },
@@ -102,6 +102,8 @@ const deletePlanDB = async (id: string) => {
   if (!plan) throw new AppError(httpStatus.NOT_FOUND, "Plan not found");
   return { _id: id };
 };
+
+const deletePlanDB = withBulkDeleteId(deletePlanDBOne);
 
 export const planService = {
   createPlanDB,

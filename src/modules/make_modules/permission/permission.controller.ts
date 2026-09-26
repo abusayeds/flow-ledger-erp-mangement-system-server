@@ -17,6 +17,39 @@ const updatePermission = catchAsync(async (req: AuthRequest, res: Response) => {
   });
 });
 
+const createRole = catchAsync(async (req: AuthRequest, res: Response) => {
+  const companyId = req.user?._id;
+  const result = await permissionService.createRoleDB(companyId as string, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Role created successfully",
+    data: result,
+  });
+});
+
+const deleteRole = catchAsync(async (req: AuthRequest, res: Response) => {
+  const companyId = req.user?._id;
+  await permissionService.deleteRoleDB(companyId as string, req.params.role);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Role deleted successfully",
+    data: null,
+  });
+});
+
+const renameRole = catchAsync(async (req: AuthRequest, res: Response) => {
+  const companyId = req.user?._id;
+  const result = await permissionService.renameRoleDB(companyId as string, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Role renamed successfully",
+    data: result,
+  });
+});
+
 const updateUserPermission = catchAsync(async (req: AuthRequest, res: Response) => {
   const companyId = req.user?._id;
   const result = await permissionService.updateUserPermissionsDB(
@@ -58,9 +91,29 @@ const getAllPermissions = catchAsync(async (req: AuthRequest, res: Response) => 
   });
 });
 
+const setRoleActive = catchAsync(async (req: AuthRequest, res: Response) => {
+  const companyId = req.user?._id;
+  const result = await permissionService.setRoleActiveDB(
+    companyId as string,
+    req.body,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result?.isActive
+      ? "Role activated successfully"
+      : "Role deactivated successfully",
+    data: result,
+  });
+});
+
 export const permissionController = {
   updatePermission,
+  createRole,
+  deleteRole,
+  renameRole,
   updateUserPermission,
   getPermissionsByCompany,
   getAllPermissions,
+  setRoleActive,
 };

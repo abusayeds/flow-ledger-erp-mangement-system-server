@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { applySoftDeleteFields } from "./softDeleteSchema";
 
 /**
  * Ensures schema enum/required validators run on all update queries app-wide.
@@ -14,4 +15,6 @@ mongoose.plugin((schema) => {
   schema.pre("findOneAndUpdate", enableRunValidators);
   schema.pre("updateOne", enableRunValidators);
   schema.pre("updateMany", enableRunValidators);
+
+  applySoftDeleteFields(schema);
 });

@@ -8,6 +8,7 @@ import { recalculateBudgetTotal } from "../budget.core.service";
 import { BudgetModel } from "../budgets/budget.model";
 import { TBudgetAllocation } from "../budget.types";
 import { BudgetAllocationModel } from "./budgetAllocation.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const ensureBudget = async (userId: string, budgetId: Types.ObjectId) => {
   const budget = await BudgetModel.findOne({ _id: budgetId, ...companyScope(userId), isDeleted: false });
@@ -53,7 +54,7 @@ const createDB = async (payload: TBudgetAllocation) => {
 };
 
 const updateDB = async (id: string, userId: string, payload: Partial<TBudgetAllocation>) => {
-  const record = await BudgetAllocationModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
+  const record = await BudgetAllocationModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Budget allocation not found");
   if (payload.budget_id) await ensureBudget(userId, payload.budget_id);
   if (payload.account_id) await ensureAccount(userId, payload.account_id);
@@ -70,7 +71,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TBudgetAllo
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await BudgetAllocationModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Budget allocation not found");
   const budgetId = record.budget_id;
@@ -84,7 +85,25 @@ const getAllDB = async (userId: string, query: Record<string, unknown>) => {
   const base = BudgetAllocationModel.find({ ...companyScope(userId), isDeleted: false })
     .populate("budget_id", "budget_name status budget_type total_budget_amount")
     .populate("account_id", "account_code account_name normal_balance");
-  const build = new queryBuilder(base, query).filter().sort().fields();
+  const build = new queryBuilder(base, query);
+  await build.searchNested({
+    localFields: [],
+    refs: [
+      {
+        foreignField: "budget_id",
+        model: BudgetModel as never,
+        fields: ["budget_name"],
+        refFilter: { ...companyScope(userId), isDeleted: false },
+      },
+      {
+        foreignField: "account_id",
+        model: ChartOfAccountModel as never,
+        fields: ["account_code", "account_name"],
+        refFilter: { ...companyScope(userId), isDeleted: false },
+      },
+    ],
+  });
+  build.filter().sort().fields();
   const { totalData } = await build.paginate(
     BudgetAllocationModel.find({ ...companyScope(userId), isDeleted: false })
   );
@@ -103,6 +122,8 @@ const listExpenseAccountsDB = async (userId: string) =>
     .select("_id account_code account_name normal_balance")
     .sort({ account_code: 1 })
     .lean();
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const budgetAllocationService = {
   createDB,

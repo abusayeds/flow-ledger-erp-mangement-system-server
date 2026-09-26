@@ -1,12 +1,13 @@
 import { Types } from 'mongoose';
 
-export const proformaInvoiceStatus = ['Draft', 'Partial', 'Paid', 'Overdue', 'Recurring', 'Void', 'CreditNotesApplied', 'Open'] as const;
+export const proformaInvoiceStatus = ['Draft', 'Partial', 'Paid', 'Overdue', 'Recurring', 'Void', 'CreditNotesApplied', 'Open', 'Sent', 'Invoiced', 'Cancelled'] as const;
 type Status = (typeof proformaInvoiceStatus)[number];
 
 export type TProformaInvoice = {
   _id?: Types.ObjectId;
   user_id: Types.ObjectId;
   customer_id?: Types.ObjectId;
+  customer_name?: string;
   vendor_id?: Types.ObjectId;
   invoice_number?: string;
   currency?: string;
@@ -35,7 +36,9 @@ export type TProformaInvoice = {
   };
   product?: [
     {
-      product_id: Types.ObjectId;
+      product_id?: Types.ObjectId;
+      product_name?: string;
+      description?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -45,7 +48,8 @@ export type TProformaInvoice = {
   ];
   service?: [
     {
-      service_id: Types.ObjectId;
+      service_id?: Types.ObjectId;
+      service_name?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -58,14 +62,16 @@ export type TProformaInvoice = {
   notes?: string;
   internal_notes?: string;
   Attachment?: string;
+  signature?: string;
   sub_total: number;
   deposit: number | string;
   discount: number | string;
   shipping_cost: number | string;
   inline_discount: number;
   tax: number;
+  tax_breakdown?: { name: string; rate: number; base: number; amount: number }[];
   total: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

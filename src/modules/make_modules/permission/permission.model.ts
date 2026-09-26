@@ -1,6 +1,5 @@
 import mongoose, { Schema } from "mongoose";
 import { TPermission } from "./permission.interface";
-import { role } from "../../../utils/role";
 
 const permissionSchema = new Schema<TPermission>(
   {
@@ -10,12 +9,23 @@ const permissionSchema = new Schema<TPermission>(
       required: false,
       default: null,
     },
+    // Free-form so companies can define custom roles (not just the base enum).
+    // Reserved names (superadmin/company) are blocked in the service layer.
     role: {
       type: String,
-      enum: Object.values(role),
       required: true,
+      trim: true,
     },
     permissions: [{ type: String }],
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    label: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   { timestamps: true },
 );

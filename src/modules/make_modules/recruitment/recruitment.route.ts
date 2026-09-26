@@ -16,11 +16,17 @@ import { offerRoutes } from "./offer/offer.route";
 import { candidateOnboardingRoutes } from "./candidateOnboarding/candidateOnboarding.route";
 import { recruitmentSettingRoutes } from "./recruitmentSetting/recruitmentSetting.route";
 import { careersRoutes } from "./careers/careers.route";
+import { authMiddleware } from "../../../middlewares/auth";
+import { role } from "../../../utils/role";
+import { recruitmentDashboardController } from "./dashboard/recruitmentDashboard.controller";
 
 const router = express.Router();
 
 // Public careers portal (no auth) — anonymous requests skip the subscription gateway.
 router.use("/careers", careersRoutes);
+
+// Overview dashboard
+router.get("/dashboard", authMiddleware(role.company), recruitmentDashboardController.getDashboard);
 
 // System setup / configuration resources
 router.use("/job-types", jobTypeRoutes);

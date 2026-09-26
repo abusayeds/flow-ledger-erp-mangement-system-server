@@ -3,10 +3,11 @@ import { AuthRequest } from "../../../middlewares/auth";
 import catchAsync from "../../../utils/catchAsync";
 import sendResponse from "../../../utils/sendResponse";
 import { quotationService } from "./quotation.service";
-import { Types } from "mongoose";
-import { ActivitiesType } from "../activities/activities.interface";
+import { ActivityAction } from "../activities/activities.interface";
 import { activitiesService } from "../activities/activities.service";
 import { TQuotation } from "./quotation.interface";
+import { ActivityModule } from "../../../utils/activityModules";
+import { activityActors } from "../../../utils/activityContext";
 
 const create = catchAsync(async (req: AuthRequest, res) => {
   req.body.user_id = req?.user?._id;
@@ -18,9 +19,11 @@ const create = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Created,
-    title: "Quotation create",
+    ...activityActors(req),
+    module: ActivityModule.quotation,
+    entity_ids: [result._id!],
+    action: ActivityAction.created,
+    title: `Quotation ${result.quotation_number ?? result._id} Created`,
   });
 });
 
@@ -56,9 +59,11 @@ const update = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Updated,
-    title: "Quotation update",
+    ...activityActors(req),
+    module: ActivityModule.quotation,
+    entity_ids: [result?._id ?? id],
+    action: ActivityAction.updated,
+    title: `Quotation ${result?.quotation_number ?? id} Updated`,
   });
 });
 
@@ -72,9 +77,11 @@ const remove = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Archived,
-    title: "Quotation delete",
+    ...activityActors(req),
+    module: ActivityModule.quotation,
+    entity_ids: [result?._id ?? id],
+    action: ActivityAction.archived,
+    title: `Quotation ${result?.quotation_number ?? id} Deleted`,
   });
 });
 

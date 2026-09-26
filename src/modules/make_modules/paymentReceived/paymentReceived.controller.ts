@@ -3,10 +3,11 @@ import { AuthRequest } from '../../../middlewares/auth';
 import catchAsync from '../../../utils/catchAsync';
 import sendResponse from '../../../utils/sendResponse';
 import { paymentReceivedService } from './paymentReceived.service';
-import { Types } from 'mongoose';
-import { ActivitiesType } from '../activities/activities.interface';
+import { ActivityAction } from '../activities/activities.interface';
 import { activitiesService } from '../activities/activities.service';
 import { TPaymentReceived } from './paymentReceived.interface';
+import { ActivityModule } from '../../../utils/activityModules';
+import { activityActors } from '../../../utils/activityContext';
 
 const create = catchAsync(async (req: AuthRequest, res) => {
   req.body.user_id = req?.user?._id;
@@ -17,10 +18,12 @@ const create = catchAsync(async (req: AuthRequest, res) => {
     message: 'PaymentReceived created successfully.',
     data: result,
   });
-  await activitiesService.activitiesCreateDB({ 
-    user_id: req?.user?._id as Types.ObjectId, 
-    type: ActivitiesType.Created, 
-    title: 'PaymentReceived Create' 
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.payment_received,
+    entity_ids: [result._id!],
+    action: ActivityAction.created,
+    title: `Payment Received ${result.invoice_number ?? result._id} Created`,
   });
 });
 
@@ -46,4 +49,93 @@ const getAll = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
-export const paymentReceivedController = { create, getSingle, getAll };
+const update = catchAsync(async (req: AuthRequest, res) => {
+  const data = await paymentReceivedService.updateDB(
+    req.params.id,
+    req.user?._id as string,
+    req.body
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'PaymentReceived updated successfully.',
+    data,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.payment_received,
+    entity_ids: [data?._id ?? req.params.id],
+    action: ActivityAction.updated,
+    title: `Payment Received ${data?.invoice_number ?? req.params.id} Updated`,
+  });
+});
+
+const remove = catchAsync(async (req: AuthRequest, res) => {
+  const data = await paymentReceivedService.deleteDB(
+    req.params.id,
+    req.user?._id as string
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'PaymentReceived deleted successfully.',
+    data,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.payment_received,
+    entity_ids: [req.params.id],
+    action: ActivityAction.archived,
+    title: `Payment Received ${req.params.id} Deleted`,
+  });
+});
+
+const restore = catchAsync(async (req: AuthRequest, res) => {
+  const data = await paymentReceivedService.restoreDB(
+    req.params.id,
+    req.user?._id as string
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'PaymentReceived restored successfully.',
+    data,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.payment_received,
+    entity_ids: [req.params.id],
+    action: ActivityAction.updated,
+    title: `Payment Received ${req.params.id} Restored`,
+  });
+});
+
+const hardRemove = catchAsync(async (req: AuthRequest, res) => {
+  await paymentReceivedService.hardDeleteDB(
+    req.params.id,
+    req.user?._id as string
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'PaymentReceived permanently deleted.',
+    data: null,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.payment_received,
+    entity_ids: [req.params.id],
+    action: ActivityAction.deleted,
+    title: `Payment Received ${req.params.id} Permanently Deleted`,
+  });
+});
+
+export const paymentReceivedController = {
+  create,
+  getSingle,
+  getAll,
+  update,
+  remove,
+  restore,
+  hardRemove,
+};

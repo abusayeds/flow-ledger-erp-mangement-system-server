@@ -2,11 +2,12 @@ import httpStatus from "http-status";
 import { AuthRequest } from "../../../../middlewares/auth";
 import catchAsync from "../../../../utils/catchAsync";
 import sendResponse from "../../../../utils/sendResponse";
-import { Types } from "mongoose";
 import { accountCreditNoteService } from "./accountCreditNote.service";
-import { ActivitiesType } from "../../activities/activities.interface";
+import { ActivityAction } from "../../activities/activities.interface";
 import { activitiesService } from "../../activities/activities.service";
 import { TCreditNote } from "../../creditNote/creditNote.interface";
+import { ActivityModule } from "../../../../utils/activityModules";
+import { activityActors } from "../../../../utils/activityContext";
 
 const create = catchAsync(async (req: AuthRequest, res) => {
   req.body.user_id = req.user!._id;
@@ -18,9 +19,11 @@ const create = catchAsync(async (req: AuthRequest, res) => {
     data,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req.user!._id as Types.ObjectId,
-    type: ActivitiesType.Created,
-    title: "Credit note created",
+    ...activityActors(req),
+    module: ActivityModule.account_credit_note,
+    entity_ids: [data._id!],
+    action: ActivityAction.created,
+    title: `Account Credit Note ${data.invoice_number ?? data._id} Created`,
   });
 });
 
@@ -65,4 +68,57 @@ const remove = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
-export const accountCreditNoteController = { create, getAll, getSingle, approve, remove };
+const hardRemove = catchAsync(async (req: AuthRequest, res) => {
+  const data = await accountCreditNoteService.hardDeleteDB(req.params.id, req.user!._id as string);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Credit note permanently deleted",
+    data,
+  });
+});
+
+const update = catchAsync(async (req: AuthRequest, res) => {
+  const data = await accountCreditNoteService.updateDB(
+    req.params.id,
+    req.user!._id as string,
+    req.body
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Credit note updated successfully",
+    data,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.account_credit_note,
+    entity_ids: [data?._id ?? req.params.id],
+    action: ActivityAction.updated,
+    title: `Account Credit Note ${data?.invoice_number ?? req.params.id} Updated`,
+  });
+});
+
+const restore = catchAsync(async (req: AuthRequest, res) => {
+  const data = await accountCreditNoteService.restoreDB(
+    req.params.id,
+    req.user!._id as string
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Credit note restored successfully",
+    data,
+  });
+});
+
+export const accountCreditNoteController = {
+  create,
+  getAll,
+  getSingle,
+  approve,
+  remove,
+  hardRemove,
+  update,
+  restore,
+};

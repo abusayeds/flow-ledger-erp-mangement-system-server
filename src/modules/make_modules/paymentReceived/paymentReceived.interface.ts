@@ -7,7 +7,11 @@ export type TPaymentReceived = {
   _id?: Types.ObjectId;
   user_id: Types.ObjectId;
   customer_id?: Types.ObjectId;
+  /** Typed customer name when none was picked from the list. */
+  customer_name?: string;
   vendor_id?: Types.ObjectId;
+  /** The invoice this payment is applied to (drives its Paid/Partial status). */
+  invoice_id?: Types.ObjectId;
   invoice_number?: string;
   currency?: string;
   date?: Date;
@@ -66,6 +70,6 @@ export type TPaymentReceived = {
   tax: number;
   total: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

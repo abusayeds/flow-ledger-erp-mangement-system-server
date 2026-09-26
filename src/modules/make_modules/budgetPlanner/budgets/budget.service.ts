@@ -7,6 +7,7 @@ import { AuthRequest } from "../../../../middlewares/auth";
 import { BudgetPeriodModel } from "../budgetPeriod/budgetPeriod.model";
 import { TBudget } from "../budget.types";
 import { BudgetModel } from "./budget.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const ensureActivePeriod = async (userId: string, periodId: Types.ObjectId) => {
   const period = await BudgetPeriodModel.findOne({
@@ -31,7 +32,7 @@ const createDB = async (payload: TBudget) => {
 };
 
 const updateDB = async (id: string, userId: string, payload: Partial<TBudget>) => {
-  const record = await BudgetModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
+  const record = await BudgetModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Budget not found");
   if (record.status !== "draft") {
     throw new AppError(httpStatus.BAD_REQUEST, "Only draft budgets can be edited");
@@ -42,7 +43,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TBudget>) =
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await BudgetModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Budget not found");
   if (record.status !== "draft") {
@@ -113,6 +114,8 @@ const listForAllocationDB = async (userId: string) =>
     .populate("period_id", "period_name")
     .sort({ createdAt: -1 })
     .lean();
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const budgetService = {
   createDB,

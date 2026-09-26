@@ -28,7 +28,7 @@ const productSchema = new Schema<TProduct>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
     productName: { type: String, required: true, trim: true },
-    category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
+    category: { type: Schema.Types.ObjectId, ref: "Category"},
     tax: { type: Schema.Types.ObjectId, ref: "Tax" },
     sku: { type: String, trim: true,  sparse: true },
     unitType: { type: String },
@@ -36,7 +36,7 @@ const productSchema = new Schema<TProduct>(
     image: { type: String },
 
     pricing: { type: pricingSchema, required: true },
-    stock: { type: stockSchema, required: true },
+    stock: { type: stockSchema },
 
     description: { type: String, trim: true },
     isDeleted: { type: Boolean, default: false },

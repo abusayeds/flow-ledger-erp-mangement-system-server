@@ -18,6 +18,7 @@ import { BalanceSheetItemModel } from "./balanceSheetItem.model";
 import { BalanceSheetNoteModel } from "./balanceSheetNote.model";
 import { ComparativeBalanceSheetModel } from "./comparativeBalanceSheet.model";
 import { formatBalanceSheetViewResponse } from "./balanceSheet.utils";
+import { withBulkDeleteId, runBulkDelete, parseDeleteIdsFromParam } from "../../../../utils/bulkDelete";
 
 const RETAINED_EARNINGS_CODE = "3200";
 
@@ -212,7 +213,7 @@ const finalizeDB = async (id: string, userId: string) => {
   return sheet;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const sheet = await BalanceSheetModel.findOne({
     _id: id,
     ...companyScope(userId),
@@ -262,7 +263,7 @@ const addNoteDB = async (
   });
 };
 
-const deleteNoteDB = async (balanceSheetId: string, noteId: string, userId: string) => {
+const deleteNoteDBOne = async (balanceSheetId: string, noteId: string, userId: string) => {
   const note = await BalanceSheetNoteModel.findOne({
     _id: noteId,
     balance_sheet_id: balanceSheetId,
@@ -457,6 +458,11 @@ const yearEndCloseDB = async (
 
   return { financial_year, next_year: nextYear, closing_date };
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
+
+const deleteNoteDB = async (balanceSheetId: string, noteId: string, userId: string) =>
+  runBulkDelete(parseDeleteIdsFromParam(noteId), (oneNoteId) => deleteNoteDBOne(balanceSheetId, oneNoteId, userId));
 
 export const balanceSheetService = {
   generateBalanceSheetDB,

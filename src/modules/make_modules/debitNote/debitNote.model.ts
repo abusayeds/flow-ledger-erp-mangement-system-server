@@ -15,7 +15,10 @@ const addressSchema = new Schema(
 
 const productSchema = new Schema(
   {
-    product_id: { type: Types.ObjectId, ref: 'Product', required: true },
+    // Optional: picked product (product_id) OR typed free-text product_name.
+    product_id: { type: Types.ObjectId, ref: 'Product' },
+    product_name: { type: String },
+    description: { type: String },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
     tax: { type: Number, default: 0 },
@@ -28,6 +31,7 @@ const productSchema = new Schema(
 const serviceSchema = new Schema(
   {
     service_id: { type: Types.ObjectId, ref: 'Service' },
+    service_name: { type: String },
     quantity: { type: Number },
     rate: { type: Number },
     tax: { type: Number, default: 0 },
@@ -41,6 +45,7 @@ const debitNoteSchema = new Schema<TDebitNote>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     vendor_id: { type: Schema.Types.ObjectId, ref: 'User' },
+    vendor_name: { type: String },
     source: { type: String, enum: ['manual', 'return'], default: 'manual' },
     return_id: { type: Schema.Types.ObjectId, ref: 'ReturnPurchase' },
     source_invoice_id: { type: Schema.Types.ObjectId },
@@ -61,7 +66,11 @@ const debitNoteSchema = new Schema<TDebitNote>(
     terms_and_conditions: { type: String },
     notes: { type: String },
     internal_notes: { type: String },
+    // Uploaded via POST /api/v1/upload; stores the returned file_path.
+    attachments: { type: String },
     Attachment: { type: String },
+    // Captured vendor signature — server-relative path from POST /api/v1/upload.
+    signature: { type: String },
     status: { type: String, enum: debitNoteStatus, default: 'Draft' },
     sub_total: { type: Number, default: 0 },
     deposit: { type: Number, default: 0 },
@@ -69,11 +78,23 @@ const debitNoteSchema = new Schema<TDebitNote>(
     shipping_cost: { type: Number, default: 0 },
     inline_discount: { type: Number, default: 0 },
     tax: { type: Number, default: 0 },
+    tax_breakdown: {
+      type: [
+        {
+          _id: false,
+          name: { type: String },
+          rate: { type: Number, default: 0 },
+          base: { type: Number, default: 0 },
+          amount: { type: Number, default: 0 },
+        },
+      ],
+      default: [],
+    },
     total: { type: Number, default: 0 },
     applied_amount: { type: Number, default: 0 },
     balance_amount: { type: Number, default: 0 },
     isDeleted: { type: Boolean, default: false },
-    archive: { type: Boolean, default: false },
+    isArchive: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

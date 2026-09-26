@@ -11,6 +11,7 @@ import {
 import { TGoalContribution } from "../goal.types";
 import { GoalModel } from "../goals/goal.model";
 import { GoalContributionModel } from "./goalContribution.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const createDB = async (
   userId: string,
@@ -54,14 +55,13 @@ const createDB = async (
 const updateDB = async (id: string, userId: string, payload: Partial<TGoalContribution>) => {
   const record = await GoalContributionModel.findOne({
     _id: id,
-    ...companyScope(userId),
-    isDeleted: false,
+    ...companyScope(userId)
   });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Contribution not found");
 
   const oldAmount = record.contribution_amount;
   const goalId = (payload.goal_id ?? record.goal_id).toString();
-  const goal = await GoalModel.findOne({ _id: goalId, ...companyScope(userId), isDeleted: false });
+  const goal = await GoalModel.findOne({ _id: goalId, ...companyScope(userId) });
   if (!goal) throw new AppError(httpStatus.NOT_FOUND, "Goal not found");
 
   Object.assign(record, payload);
@@ -76,7 +76,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TGoalContri
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await GoalContributionModel.findOne({
     _id: id,
     ...companyScope(userId),
@@ -107,11 +107,18 @@ const getAllDB = async (userId: string, query: Record<string, unknown>) => {
     "goal_id",
     "goal_name goal_type status"
   );
-  const build = new queryBuilder(base, query)
-    .search(["notes"])
-    .filter()
-    .sort()
-    .fields();
+  const build = new queryBuilder(base, query);
+  await build.searchNested({
+    localFields: ["notes"],
+    refs: [
+      {
+        foreignField: "goal_id",
+        model: GoalModel as never,
+        fields: ["goal_name"],
+      },
+    ],
+  });
+  build.filter().sort().fields();
   const { totalData } = await build.paginate(
     GoalContributionModel.find({ ...companyScope(userId), isDeleted: false })
   );
@@ -120,5 +127,7 @@ const getAllDB = async (userId: string, query: Record<string, unknown>) => {
   const limit = Number(query.limit) || 10;
   return { rows, pagination: build.calculatePagination({ totalData, currentPage: page, limit }) };
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const goalContributionService = { createDB, updateDB, deleteDB, getAllDB };

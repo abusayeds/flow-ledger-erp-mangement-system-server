@@ -218,8 +218,7 @@ export const getAccountSection = (accountCode: string) => {
 export const updateCoaBalancesFromJournal = async (journalEntryId: Types.ObjectId, userId: string) => {
   const items = await JournalEntryItemModel.find({
     journal_entry_id: journalEntryId,
-    ...companyScope(userId),
-    isDeleted: false,
+    ...companyScope(userId)
   });
   for (const item of items) {
     const balance = await getAccountBalance(userId, item.account_id);

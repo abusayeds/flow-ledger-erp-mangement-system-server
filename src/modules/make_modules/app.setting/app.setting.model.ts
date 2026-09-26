@@ -8,6 +8,7 @@ const docFieldVisibilitySchema = new Schema(
   {
     due_date: Boolean,
     shipping_address: Boolean,
+    internal_notes: Boolean,
     street1: Boolean,
     street2: Boolean,
     zip_code: Boolean,
@@ -16,8 +17,10 @@ const docFieldVisibilitySchema = new Schema(
     country: Boolean,
     sub_title: Boolean,
     po: Boolean,
+    po_date: Boolean,
     recipient_name: Boolean,
     shipping_cost_and_method: Boolean,
+    shipping_tax: Boolean,
     salesperson: Boolean,
     payment_methods: Boolean,
     payment_type: Boolean,
@@ -32,6 +35,7 @@ const docFieldVisibilitySchema = new Schema(
 const docGeneralSchema = new Schema(
   {
     line_option: String,
+    create_public_url_in_email: Boolean,
     track_purchase_orders_in_stock: Boolean,
   },
   { _id: false }
@@ -64,6 +68,8 @@ const docSummarySchema = new Schema(
     negative_value_format: Boolean,
     subtotal_with_tax: String,
     contact_note_as_default_note: Boolean,
+    custom_charges: Boolean,
+    inline_discount: Boolean,
     show_line_total_with_tax: Boolean,
   },
   { _id: false }
@@ -79,6 +85,13 @@ const docPrintEmailSchema = new Schema(
   { _id: false }
 );
 
+const docPaymentSchema = new Schema(
+  {
+    cash_received_denomination: Boolean,
+  },
+  { _id: false }
+);
+
 const documentSchema = () =>
   new Schema(
     {
@@ -87,6 +100,7 @@ const documentSchema = () =>
       columns: docColumnsSchema,
       summary: docSummarySchema,
       print_email: docPrintEmailSchema,
+      payment: docPaymentSchema,
     },
     { _id: false }
   );
@@ -145,9 +159,37 @@ const settingSchema = new Schema(
       print_mode: String,
     },
 
+    // App lock (Face ID / device passcode) preference — synced across devices.
+    security: {
+      app_lock_enabled: Boolean,
+    },
+
+    // Custom UI title overrides (Edit Titles): { <stable slug>: <custom text> }.
+    titles: { type: Schema.Types.Mixed, default: {} },
+
     whatsApp: {
       enabled: Boolean,
       send_via: String,
+    },
+
+    // Notification Settings (reminders / recurring) — additive, optional.
+    notification: {
+      timezone: String,
+      notification_time: String,
+      recurring: {
+        auto_send_invoice: Boolean,
+        daily: Boolean,
+        weekly: Boolean,
+        monthly: Boolean,
+      },
+      payment_reminder: {
+        auto_send_payment_receipt: Boolean,
+        default_for_new_customer: Boolean,
+        days_before_due_3: Boolean,
+        on_due_date: Boolean,
+        days_after_due_3: Boolean,
+        days_after_due_7: Boolean,
+      },
     },
 
     invoice: documentSchema(),
@@ -177,6 +219,11 @@ const settingSchema = new Schema(
       },
       stock: {
         product_stock: Boolean,
+        out_of_stock_items_online_store: String,
+      },
+      checkout: {
+        product_price_on_checkout: Boolean,
+        product_image_size: String,
       },
     },
 

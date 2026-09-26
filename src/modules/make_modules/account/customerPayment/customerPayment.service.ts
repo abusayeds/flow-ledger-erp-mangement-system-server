@@ -14,10 +14,12 @@ import {
   TCreditNoteApplication,
 } from "./customerPayment.interface";
 import { CustomerPaymentModel } from "./customerPayment.model";
+import { UserModel } from "../../../basic_modules/user/user.model";
 import { InvoiceModel } from "../../invoice/invoice.model";
 import { CreditNoteModel } from "../../creditNote/creditNote.model";
 import { BankAccountModel } from "../bankAccount/bankAccount.model";
 import { createBankTransaction } from "../accountBank.service";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const OPEN_STATUSES = ["Open", "Partial", "Overdue"];
 
@@ -28,8 +30,7 @@ const updateInvoiceBalance = async (
 ) => {
   const invoice = await InvoiceModel.findOne({
     _id: invoiceId,
-    user_id: userId,
-    isDeleted: false,
+    user_id: userId
   });
   if (!invoice) throw new AppError(httpStatus.BAD_REQUEST, "Invalid invoice in allocation");
 
@@ -149,12 +150,26 @@ const getAllDB = async (userId: string, query: Record<string, unknown>) => {
     .populate("customer_id", CLIENT_POPULATE_SELECT)
     .populate("bank_account_id", "account_name account_number")
     .populate("allocations.invoice_id", "invoice_number total balance_amount status");
-  const build = new queryBuilder(base, query)
-    .search(["payment_number", "reference_number", "notes"])
-    .filter()
-    .sort()
-    .fields();
-  const { totalData } = await build.paginate(CustomerPaymentModel.find(companyScope(userId)));
+  const build = new queryBuilder(base, query);
+
+  // Search matches the payment's own text AND the customer (referenced User) by
+  // name/company — so `searchTerm` finds payments by customer, not just the
+  // payment/reference number. Awaited before filter/paginate.
+  await build.searchNested({
+    localFields: ["payment_number", "reference_number", "notes"],
+    refs: [
+      {
+        foreignField: "customer_id",
+        model: UserModel,
+        fields: ["name", "email", "phone"],
+        dotFields: ["businessProfile.companyName"],
+        refFilter: { companyId: userId },
+      },
+    ],
+  });
+
+  build.filter().sort().fields();
+  const { totalData } = await build.paginate();
   const rows = await build.modelQuery.exec();
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 10;
@@ -213,7 +228,7 @@ const updateStatusDB = async (id: string, userId: string, status: string) => {
         amount: record.payment_amount,
         running_balance: 0,
         transaction_status: "cleared",
-        reconciliation_status: "unreconciled",
+        reconciliation_status: "unreconciled"
       });
     }
 
@@ -241,7 +256,7 @@ const updateStatusDB = async (id: string, userId: string, status: string) => {
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await CustomerPaymentModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Customer payment not found");
   if (record.status !== "pending") {
@@ -251,6 +266,8 @@ const deleteDB = async (id: string, userId: string) => {
   await record.save();
   return record;
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const customerPaymentService = {
   createDB,

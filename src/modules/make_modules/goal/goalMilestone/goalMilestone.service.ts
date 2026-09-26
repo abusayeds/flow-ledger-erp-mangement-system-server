@@ -7,6 +7,7 @@ import { assertMilestoneTotalWithinGoal } from "../goal.core.service";
 import { TGoalMilestone } from "../goal.types";
 import { GoalModel } from "../goals/goal.model";
 import { GoalMilestoneModel } from "./goalMilestone.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const ensureGoal = async (userId: string, goalId: Types.ObjectId) => {
   const goal = await GoalModel.findOne({ _id: goalId, ...companyScope(userId), isDeleted: false });
@@ -29,7 +30,7 @@ const createDB = async (payload: TGoalMilestone) => {
 };
 
 const updateDB = async (id: string, userId: string, payload: Partial<TGoalMilestone>) => {
-  const record = await GoalMilestoneModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
+  const record = await GoalMilestoneModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Milestone not found");
   const goalId = (payload.goal_id ?? record.goal_id).toString();
   if (payload.goal_id) await ensureGoal(userId, payload.goal_id);
@@ -41,7 +42,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TGoalMilest
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await GoalMilestoneModel.findOneAndUpdate(
     { _id: id, ...companyScope(userId) },
     { isDeleted: true },
@@ -76,6 +77,8 @@ const getSingleDB = async (id: string, userId: string) => {
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Milestone not found");
   return record;
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const goalMilestoneService = {
   createDB,

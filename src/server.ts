@@ -20,8 +20,6 @@ async function main() {
 
     // Seed super admin data
     await seedSuperAdmin();
-
-    // Create the HTTP server
     server.listen(PORT, () => {
       console.log(`Server is running on ${PORT}`);
     });

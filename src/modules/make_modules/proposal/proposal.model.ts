@@ -6,7 +6,9 @@ type ProposalDocument = TProposal & { sub_total?: number };
 
 const productSchema = new Schema(
   {
-    product_id: { type: Types.ObjectId, ref: "Product", required: true },
+    product_id: { type: Types.ObjectId, ref: "Product" },
+    product_name: { type: String },
+    description: { type: String },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
     tax: { type: Number, default: 0 },
@@ -19,6 +21,7 @@ const productSchema = new Schema(
 const serviceSchema = new Schema(
   {
     service_id: { type: Types.ObjectId, ref: "Service" },
+    service_name: { type: String },
     quantity: { type: Number },
     rate: { type: Number },
     tax: { type: Number, default: 0 },
@@ -50,7 +53,7 @@ const proposalSchema = new Schema<ProposalDocument>(
     sub_total: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     isDeleted: { type: Boolean, default: false },
-    archive: { type: Boolean, default: false },
+    isArchive: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

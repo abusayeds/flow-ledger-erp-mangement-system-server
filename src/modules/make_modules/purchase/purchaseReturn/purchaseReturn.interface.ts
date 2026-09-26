@@ -9,7 +9,7 @@ export const purchaseReturnReasons = [
 ] as const;
 export type TPurchaseReturnReason = (typeof purchaseReturnReasons)[number];
 
-export const purchaseReturnStatus = ["draft", "approved", "completed", "cancelled"] as const;
+export const purchaseReturnStatus = ["draft", "approved", "completed", "processing", "cancelled"] as const;
 export type TPurchaseReturnStatus = (typeof purchaseReturnStatus)[number];
 
 export type TPurchaseReturnItem = {

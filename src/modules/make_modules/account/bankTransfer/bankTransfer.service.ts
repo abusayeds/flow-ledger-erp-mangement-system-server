@@ -10,6 +10,7 @@ import { TBankTransfer } from "./bankTransfer.interface";
 import { BankTransferModel } from "./bankTransfer.model";
 import { BankAccountModel } from "../bankAccount/bankAccount.model";
 import { createBankTransaction } from "../accountBank.service";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const assertAccounts = async (
   userId: string,
@@ -56,7 +57,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TBankTransf
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await BankTransferModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Bank transfer not found");
   if (record.status !== "pending") {
@@ -124,5 +125,7 @@ const processDB = async (id: string, userId: string) => {
   await record.save();
   return record;
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const bankTransferService = { createDB, updateDB, deleteDB, getAllDB, processDB };

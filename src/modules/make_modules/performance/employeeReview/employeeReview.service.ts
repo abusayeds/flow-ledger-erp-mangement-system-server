@@ -22,6 +22,7 @@ import {
   TPerformanceEmployeeReview,
   TReviewRatings,
 } from "./employeeReview.interface";
+import { withBulkDeleteAuthId } from "../../../../utils/bulkDelete";
 
 const P = permission.performance.employee_review;
 
@@ -272,7 +273,7 @@ const updateDB = async (req: AuthRequest, id: string, body: Record<string, unkno
   return reviewDetail(updated);
 };
 
-const removeDB = async (req: AuthRequest, id: string) => {
+const removeDBOne = async (req: AuthRequest, id: string) => {
   await getOwnedReview(req, id);
   const companyId = resolveCompanyId(req);
   await PerformanceEmployeeReviewModel.findOneAndUpdate(
@@ -281,6 +282,8 @@ const removeDB = async (req: AuthRequest, id: string) => {
   );
   return { _id: id };
 };
+
+const removeDB = withBulkDeleteAuthId(removeDBOne);
 
 export const employeeReviewService = {
   createDB,

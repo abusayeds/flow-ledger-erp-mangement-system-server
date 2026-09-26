@@ -43,9 +43,11 @@
 
 
 import { createLogger, format, transports } from "winston";
+import Transport from "winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
 import path from "path";
 import express, { Request, Response, NextFunction } from "express";
+import { EventEmitter } from "events";
 import {
   blue,
   green,
@@ -55,6 +57,26 @@ import {
   yellow,
   yellowBright,
 } from "colorette";
+
+// Broadcasts every log entry so the /logs live-viewer (routes/logs.route.ts)
+// can stream them over SSE without touching disk.
+export const logEmitter = new EventEmitter();
+logEmitter.setMaxListeners(0);
+
+const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+
+class LiveStreamTransport extends Transport {
+  log(info: Record<string, any>, callback: () => void) {
+    setImmediate(() => this.emit("logged", info));
+    logEmitter.emit("log", {
+      level: info.level,
+      message: typeof info.message === "string" ? stripAnsi(info.message) : info.message,
+      size: info.size,
+      timestamp: info.timestamp,
+    });
+    callback();
+  }
+}
 
 export const logger = createLogger({
   level: "info",
@@ -80,6 +102,8 @@ export const logger = createLogger({
     new transports.Console({
       format: format.combine(format.colorize(), format.simple()),
     }),
+    // Feed the real-time /logs viewer
+    new LiveStreamTransport(),
   ],
 });
 

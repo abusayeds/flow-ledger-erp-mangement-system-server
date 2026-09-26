@@ -7,6 +7,7 @@ import { updateGoalTracking, validateGoalAccount } from "../goal.core.service";
 import { TGoal } from "../goal.types";
 import { GoalCategoryModel } from "../goalCategory/goalCategory.model";
 import { GoalModel } from "./goal.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const ensureCategory = async (userId: string, categoryId: Types.ObjectId) => {
   const cat = await GoalCategoryModel.findOne({
@@ -33,7 +34,7 @@ const createDB = async (payload: TGoal) => {
 };
 
 const updateDB = async (id: string, userId: string, payload: Partial<TGoal>) => {
-  const record = await GoalModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
+  const record = await GoalModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Goal not found");
   if (payload.category_id) await ensureCategory(userId, payload.category_id);
   if (payload.account_id !== undefined) {
@@ -60,7 +61,7 @@ const activateDB = async (id: string, userId: string) => {
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await GoalModel.findOneAndUpdate(
     { _id: id, ...companyScope(userId) },
     { isDeleted: true },
@@ -95,6 +96,8 @@ const getSingleDB = async (id: string, userId: string) => {
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Goal not found");
   return record;
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const goalService = {
   createDB,

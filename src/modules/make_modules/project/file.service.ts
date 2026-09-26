@@ -12,6 +12,7 @@ import {
   logProjectActivity,
 } from "./project.utils";
 import { UPLOAD_URL_PREFIX } from "../../../middlewares/fileUploadNormal";
+import { withBulkDeleteIdSecond } from "../../../utils/bulkDelete";
 
 type ReqLite = { protocol: string; get: (n: string) => string | undefined };
 type FileDoc = TProjectFile & { _id: Types.ObjectId; createdAt?: Date };
@@ -67,7 +68,7 @@ const listByProject = async (userId: string, projectId: string, req?: ReqLite) =
   return formatProjectResponse(items.map((f) => shapeFile(f, req)));
 };
 
-const remove = async (userId: string, fileId: string) => {
+const removeOne = async (userId: string, fileId: string) => {
   const file = (await ProjectFileModel.findOneAndUpdate(
     { _id: fileId, user_id: userId, isDeleted: false },
     { isDeleted: true },
@@ -76,5 +77,7 @@ const remove = async (userId: string, fileId: string) => {
   if (!file) throw new AppError(httpStatus.NOT_FOUND, "File not found");
   return formatProjectResponse(shapeFile(file));
 };
+
+const remove = withBulkDeleteIdSecond(removeOne);
 
 export const fileService = { upload, listByProject, remove };

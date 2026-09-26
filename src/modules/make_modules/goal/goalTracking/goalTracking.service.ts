@@ -7,6 +7,7 @@ import { TGoalTracking } from "../goal.types";
 import { GoalModel } from "../goals/goal.model";
 import { formatTrackingDetail } from "../goal.utils";
 import { GoalTrackingModel } from "./goalTracking.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const ensureGoal = async (userId: string, goalId: Types.ObjectId) => {
   const goal = await GoalModel.findOne({ _id: goalId, ...companyScope(userId), isDeleted: false });
@@ -19,7 +20,7 @@ const createDB = async (payload: TGoalTracking) => {
 };
 
 const updateDB = async (id: string, userId: string, payload: Partial<TGoalTracking>) => {
-  const record = await GoalTrackingModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
+  const record = await GoalTrackingModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Tracking record not found");
   if (payload.goal_id) await ensureGoal(userId, payload.goal_id);
   Object.assign(record, payload);
@@ -27,7 +28,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TGoalTracki
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await GoalTrackingModel.findOneAndUpdate(
     { _id: id, ...companyScope(userId) },
     { isDeleted: true },
@@ -42,10 +43,18 @@ const getAllDB = async (userId: string, query: Record<string, unknown>) => {
     "goal_id",
     "goal_name target_amount current_amount status"
   );
-  const build = new queryBuilder(base, query)
-    .filter()
-    .sort()
-    .fields();
+  const build = new queryBuilder(base, query);
+  await build.searchNested({
+    localFields: [],
+    refs: [
+      {
+        foreignField: "goal_id",
+        model: GoalModel as never,
+        fields: ["goal_name"],
+      },
+    ],
+  });
+  build.filter().sort().fields();
   const { totalData } = await build.paginate(
     GoalTrackingModel.find({ ...companyScope(userId), isDeleted: false })
   );
@@ -77,6 +86,8 @@ const getSingleDB = async (id: string, userId: string) => {
 
   return formatTrackingDetail(record);
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const goalTrackingService = {
   createDB,

@@ -7,7 +7,10 @@ export type TExpenses = {
   _id?: Types.ObjectId;
   user_id: Types.ObjectId;
   customer_id?: Types.ObjectId;
+  customer_name?: string;
   vendor_id?: Types.ObjectId;
+  vendor_name?: string;
+  category?: string;
   invoice_number?: string;
   currency?: string;
   date?: Date;
@@ -35,7 +38,9 @@ export type TExpenses = {
   };
   product?: [
     {
-      product_id: Types.ObjectId;
+      product_id?: Types.ObjectId;
+      product_name?: string;
+      description?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -45,7 +50,8 @@ export type TExpenses = {
   ];
   service?: [
     {
-      service_id: Types.ObjectId;
+      service_id?: Types.ObjectId;
+      service_name?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -57,6 +63,8 @@ export type TExpenses = {
   terms_and_conditions?: string;
   notes?: string;
   internal_notes?: string;
+  /** Uploaded file path from POST /api/v1/upload. */
+  attachments?: string;
   Attachment?: string;
   sub_total: number;
   deposit: number | string;
@@ -66,6 +74,6 @@ export type TExpenses = {
   tax: number;
   total: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

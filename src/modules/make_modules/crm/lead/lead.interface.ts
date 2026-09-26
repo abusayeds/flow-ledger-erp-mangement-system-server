@@ -1,0 +1,31 @@
+import { Types } from "mongoose";
+import { TCrmSub } from "../deal/deal.interface";
+
+export type TLead = {
+  _id?: Types.ObjectId;
+  user_id: Types.ObjectId;
+  creator_id?: Types.ObjectId;
+  name: string;
+  email?: string;
+  phone?: string;
+  subject?: string;
+  notes?: string;
+  date?: Date;
+  pipeline_id?: Types.ObjectId;
+  stage_id?: Types.ObjectId;
+  order?: number;
+  sources?: Types.ObjectId[];
+  products?: Types.ObjectId[];
+  labels?: Types.ObjectId[];
+  assigned_users?: Types.ObjectId[];
+  tasks?: TCrmSub[];
+  calls?: TCrmSub[];
+  emails?: TCrmSub[];
+  discussions?: TCrmSub[];
+  files?: TCrmSub[];
+  is_active?: boolean;
+  is_converted?: boolean;
+  converted_deal_id?: Types.ObjectId;
+  isDeleted?: boolean;
+  createdAt?: Date;
+};

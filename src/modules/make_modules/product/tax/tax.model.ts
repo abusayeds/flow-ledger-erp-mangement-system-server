@@ -1,5 +1,5 @@
 import { Schema, model } from "mongoose";
-import { TTax } from "./tax.interface";
+import { TAX_TYPES, TTax } from "./tax.interface";
 
 const taxSchema = new Schema<TTax>(
   {
@@ -18,10 +18,17 @@ const taxSchema = new Schema<TTax>(
       required: true,
       min: 0,
     },
+    type: {
+      type: String,
+      enum: TAX_TYPES,
+      required: true,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+taxSchema.index({ user_id: 1, type: 1 });
 
 export const TaxModel = model<TTax>("Tax", taxSchema);

@@ -26,9 +26,19 @@ router.delete(
   productController.deleteProduct
 );
 router.patch(
+  "/restore/:id",
+  authMiddleware(role.company),
+  productController.restoreProduct
+);
+router.patch(
   "/update/:id",
   authMiddleware(role.company),
   productController.updateProduct
+);
+router.post(
+  "/merge",
+  authMiddleware(role.company),
+  productController.mergeProducts
 );
 
 export const productRoutes = router;

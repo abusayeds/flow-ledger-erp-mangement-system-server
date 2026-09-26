@@ -13,7 +13,7 @@ export type TPerformanceEmployeeGoal = {
   employee_id: Types.ObjectId;
   goal_type_id?: Types.ObjectId;
   title: string;
-  description: string;
+  description?: string;
   start_date: Date;
   end_date: Date;
   target: string;

@@ -11,7 +11,7 @@ import { TPurchaseReturn } from "../purchase/purchaseReturn/purchaseReturn.inter
 import { TCreditNote } from "../creditNote/creditNote.interface";
 import { TDebitNote } from "../debitNote/debitNote.interface";
 
-const buildNoteNumber = (prefix: string) => {
+export const buildNoteNumber = (prefix: string) => {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -55,8 +55,8 @@ export const createCreditNoteFromInvoiceReturn = async (
     invoice_number: buildNoteNumber("CN"),
     currency: invoice.currency,
     date: salesReturn.return_date ?? new Date(),
-    product: invoice.product ? [...invoice.product] : undefined,
-    service: invoice.service ? [...invoice.service] : undefined,
+    product: invoice.product ? [...invoice.product] as any : undefined,
+    service: invoice.service ? [...invoice.service] as any : undefined,
     billing_address: invoice.billing_address,
     shipping_address: invoice.shipping_address,
     sub_total: invoice.sub_total,

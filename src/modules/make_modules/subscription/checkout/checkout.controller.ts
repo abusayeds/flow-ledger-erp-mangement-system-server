@@ -9,10 +9,12 @@ import { STRIPE_WEBHOOK_SECRET } from "../../../../config";
 import { UserModel } from "../../../basic_modules/user/user.model";
 import { PlanModel } from "../plan/plan.model";
 import { assignPlan } from "../companySubscription/assignment.service";
-import { getActiveSubscription, resolveCompanyId } from "../subscription.helpers";
+import { getActiveSubscription, resolveCompanyId, cancelCompanySubscription } from "../subscription.helpers";
 import { TBillingCycle } from "../subscription.constants";
 import { stripe, createPlanCheckoutSession } from "./checkout.service";
 import { renderSuccessPage, renderCancelPage } from "./checkout.pages";
+import { Types } from "mongoose";
+import { SubscriptionPaymentModel } from "../subscriptionPayment/subscriptionPayment.model";
 
 /** POST /subscription/checkout — company starts a paid subscription (monthly | yearly). */
 const createCheckout = catchAsync(async (req: AuthRequest, res) => {
@@ -116,6 +118,18 @@ const mySubscription = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
+/** POST /subscription/cancel — stop auto-renew; access continues until end_date. */
+const cancelSubscription = catchAsync(async (req: AuthRequest, res) => {
+  const companyId = resolveCompanyId(req);
+  const sub = await cancelCompanySubscription(companyId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Subscription cancelled. You keep access until the current period ends.",
+    data: sub,
+  });
+});
+
 /** POST /stripe/webhook (raw body, mounted in app.ts). Activates the plan on successful payment. */
 const webhook = async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
@@ -139,6 +153,27 @@ const webhook = async (req: Request, res: Response) => {
       }
       const cycle: TBillingCycle = meta.billing_cycle === "yearly" ? "yearly" : "monthly";
       await assignPlan(String(meta.userId), String(meta.planId), cycle);
+
+      // Record the payment in the ledger so the super admin can refund it later.
+      try {
+        const plan = await PlanModel.findById(meta.planId).lean();
+        await SubscriptionPaymentModel.create({
+          company_id: new Types.ObjectId(String(meta.userId)),
+          plan_id: plan?._id,
+          plan_name: plan?.name || "Subscription",
+          amount: session.amount_total != null ? session.amount_total / 100 : 0,
+          currency: session.currency || "usd",
+          billing_cycle: cycle,
+          status: "paid",
+          source: "stripe",
+          stripe_payment_intent:
+            typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
+          stripe_session_id: session.id,
+          paid_at: new Date(),
+        });
+      } catch (e) {
+        console.error("Failed to record subscription payment:", e);
+      }
     } else {
       console.log(`⚠️ Unhandled event type: ${event.type}`);
     }
@@ -194,6 +229,7 @@ export const checkoutController = {
   assignFree,
   startTrial,
   mySubscription,
+  cancelSubscription,
   webhook,
   checkoutSuccess,
   checkoutCancel,

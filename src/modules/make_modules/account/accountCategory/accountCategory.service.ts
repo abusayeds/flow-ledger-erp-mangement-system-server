@@ -4,6 +4,7 @@ import queryBuilder from "../../../../builder/queryBuilder";
 import { companyScope } from "../account.utils";
 import { TAccountCategory } from "./accountCategory.interface";
 import { AccountCategoryModel } from "./accountCategory.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const createDB = async (payload: TAccountCategory) => {
   const exists = await AccountCategoryModel.findOne({
@@ -24,8 +25,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TAccountCat
     const dup = await AccountCategoryModel.findOne({
       user_id: userId,
       code: payload.code,
-      isDeleted: false,
-      _id: { $ne: id },
+      _id: { $ne: id }
     });
     if (dup) throw new AppError(httpStatus.CONFLICT, "Account category code already exists");
   }
@@ -34,7 +34,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TAccountCat
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await AccountCategoryModel.findOneAndUpdate(
     { _id: id, ...companyScope(userId) },
     { isDeleted: true },
@@ -63,5 +63,7 @@ const listActiveDB = async (userId: string) =>
     .select("_id name code type")
     .sort({ name: 1 })
     .lean();
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const accountCategoryService = { createDB, updateDB, deleteDB, getAllDB, listActiveDB };

@@ -731,57 +731,6 @@ export const rolePermission = [
         ]
       },
       {
-        "module": "purchase-invoices",
-        "moduleLabel": "Purchase Invoices",
-        "permissions": [
-          {
-            "value": "manage_purchase_invoices",
-            "label": "Manage Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "manage_any_purchase_invoices",
-            "label": "Manage All Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "manage_own_purchase_invoices",
-            "label": "Manage Own Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "view_purchase_invoices",
-            "label": "View Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "create_purchase_invoices",
-            "label": "Create Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "edit_purchase_invoices",
-            "label": "Edit Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "delete_purchase_invoices",
-            "label": "Delete Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "post_purchase_invoices",
-            "label": "Post Purchase Invoices",
-            "module": "purchase-invoices"
-          },
-          {
-            "value": "print_purchase_invoices",
-            "label": "Print Purchase Invoices",
-            "module": "purchase-invoices"
-          }
-        ]
-      },
-      {
         "module": "purchase-return-invoices",
         "moduleLabel": "Purchase Return Invoices",
         "permissions": [

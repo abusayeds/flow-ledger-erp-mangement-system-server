@@ -6,6 +6,8 @@ const router = express.Router();
 const a = permission.hrm.attendances;
 
 router.get("/", hrmAuth, perm(a.manage_attendances), attendanceController.list);
+// Monthly grid (employees × days) for the attendance calendar view.
+router.get("/grid", hrmAuth, perm(a.manage_attendances), attendanceController.grid);
 router.post("/", hrmAuth, perm(a.create_attendances), attendanceController.create);
 router.get(
   "/clock-status",

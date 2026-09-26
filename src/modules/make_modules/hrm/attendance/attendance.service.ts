@@ -14,6 +14,7 @@ import {
   companyObjectId,
   companyScope,
   creatorObjectId,
+  EMPLOYEE_USER_ROLES,
   formatDateOnly,
   parseDate,
   resolveActorUserId,
@@ -22,6 +23,7 @@ import {
   spansCalendarDay,
   startOfDay,
 } from "../shared/hrm.utils";
+import { UserModel } from "../../../basic_modules/user/user.model";
 import { assertEnumValue, ATTENDANCE_STATUS } from "../shared/hrm.statusValidation";
 import {
   assertCompanyDocument,
@@ -32,6 +34,7 @@ import {
 import { AuthRequest } from "../../../../middlewares/auth";
 import { permModule } from "../../../../utils/permissionModule";
 import { getHrmCompanySettings } from "../shared/hrm.settings.service";
+import { withBulkDeleteAuthId } from "../../../../utils/bulkDelete";
 
 const formatAttendance = (row: Record<string, unknown>) => ({
   ...row,
@@ -45,6 +48,28 @@ const formatAttendanceDoc = (doc: { toObject?: () => Record<string, unknown> } |
       ? (doc as { toObject: () => Record<string, unknown> }).toObject()
       : (doc as Record<string, unknown>),
   );
+
+/**
+ * Clock times arrive from the app/web as "HH:MM" (the attendance modal), which
+ * `new Date("HH:MM")` turns into Invalid Date. Combine the time with the record's
+ * calendar `date` so it persists correctly. A full ISO string is accepted as-is.
+ */
+const combineDateTime = (date: Date, value: unknown): Date | undefined => {
+  const s = String(value ?? "").trim();
+  if (!s) return undefined;
+  if (s.includes("T")) {
+    const iso = new Date(s);
+    if (!Number.isNaN(iso.getTime())) return iso;
+  }
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m) {
+    const d = new Date(date);
+    d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    return d;
+  }
+  const fallback = new Date(s);
+  return Number.isNaN(fallback.getTime()) ? undefined : fallback;
+};
 
 type AttendanceBlockCode = "COMPANY_HOLIDAY" | "ON_LEAVE" | "NON_WORKING_DAY";
 
@@ -134,6 +159,37 @@ const assertCanClockIn = async (
   }
 };
 
+/** Statuses that mark the day without requiring a clock-in. */
+const NON_CLOCK_STATUSES = new Set(["on leave", "off day", "absent"]);
+
+const normalizeAttendanceStatus = (raw: unknown): string | undefined => {
+  if (raw === undefined || raw === null || String(raw).trim() === "") return undefined;
+  const s = String(raw).trim().toLowerCase();
+  if (s === "leave" || s === "onleave") return "on leave";
+  if (s === "half" || s === "halfday") return "half day";
+  if (s === "off" || s === "dayoff" || s === "day off") return "off day";
+  return s;
+};
+
+const resolveAttendanceStatus = (raw: unknown, fallback = "present") => {
+  const normalized = normalizeAttendanceStatus(raw);
+  if (normalized === undefined) return fallback;
+  return assertEnumValue(normalized, ATTENDANCE_STATUS, "status");
+};
+
+const removeOne = async (req: AuthRequest, oneId: string) => {
+  const companyId = resolveCompanyId(req);
+  const updated = await HrmAttendanceModel.findOneAndUpdate(
+    { _id: oneId, ...companyScope(companyId) },
+    { isDeleted: true },
+    { new: true }
+  );
+  if (!updated) throw new AppError(httpStatus.NOT_FOUND, "Attendance not found");
+  return { _id: oneId };
+};
+
+const remove = withBulkDeleteAuthId(removeOne);
+
 export const attendanceService = {
   async list(req: AuthRequest, query: Record<string, unknown>) {
     const companyId = resolveCompanyId(req);
@@ -159,6 +215,96 @@ export const attendanceService = {
     };
   },
 
+  /**
+   * Monthly attendance grid: the company's employees plus every attendance row
+   * in the requested month, keyed `<employeeUserId>:<YYYY-MM-DD>` so the client
+   * can render an employees × days matrix. Weekend/future/holiday derivation is
+   * left to the client (dates are calendar dates).
+   */
+  async grid(req: AuthRequest, query: Record<string, unknown>) {
+    const companyId = resolveCompanyId(req);
+    const now = new Date();
+    const year = Number(query.year) || now.getFullYear();
+    const month = Number(query.month) || now.getMonth() + 1; // 1-12
+    const start = startOfDay(new Date(year, month - 1, 1));
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Grid rows = every employee-role user (staff / HR) of the company, not just
+    // those with an HRM employee profile. Customers/vendors are excluded.
+    const userFilter: Record<string, unknown> = {
+      companyId: companyObjectId(companyId),
+      role: { $in: EMPLOYEE_USER_ROLES },
+      isDeleted: false,
+    };
+    if (query.employee_id) userFilter._id = companyObjectId(String(query.employee_id));
+    const users = await UserModel.find(userFilter)
+      .select("_id name email")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    // Attach each user's HRM employee code when a profile exists.
+    const profiles = await HrmEmployeeModel.find({
+      ...companyScope(companyId),
+      employee_user_id: {
+        $in: (users as Record<string, unknown>[]).map((u) => u._id),
+      },
+    })
+      .select("_id employee_id employee_user_id")
+      .lean();
+    const profileByUser: Record<string, { id: string; code: string }> = {};
+    for (const p of profiles as Record<string, unknown>[]) {
+      profileByUser[String(p.employee_user_id)] = {
+        id: String(p._id),
+        code: (p.employee_id as string) ?? "",
+      };
+    }
+
+    const records = await HrmAttendanceModel.find({
+      ...companyScope(companyId),
+      date: { $gte: start, $lte: end },
+    })
+      .select("_id employee_id date clock_in clock_out status notes total_hour")
+      .lean();
+
+    const hhmm = (v: unknown): string => {
+      if (!v) return "";
+      const d = new Date(String(v));
+      if (Number.isNaN(d.getTime())) return "";
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    };
+
+    const cells: Record<string, unknown> = {};
+    for (const r of records as Record<string, unknown>[]) {
+      const key = `${String(r.employee_id)}:${formatDateOnly(r.date as Date)}`;
+      cells[key] = {
+        _id: String(r._id),
+        clock_in: hhmm(r.clock_in),
+        clock_out: hhmm(r.clock_out),
+        status: r.status ?? "present",
+        notes: r.notes ?? "",
+        total_hour: r.total_hour ?? 0,
+      };
+    }
+
+    return {
+      year,
+      month,
+      days_in_month: new Date(year, month, 0).getDate(),
+      employees: (users as Record<string, unknown>[]).map((u) => {
+        const uid = String(u._id);
+        const profile = profileByUser[uid];
+        return {
+          _id: profile?.id ?? uid,
+          employee_user_id: uid,
+          name: (u.name as string) ?? "",
+          email: (u.email as string) ?? "",
+          employee_code: profile?.code ?? "",
+        };
+      }),
+      cells,
+    };
+  },
+
   async createManual(req: AuthRequest, body: Record<string, unknown>) {
     const companyId = resolveCompanyId(req);
     const employee_id = parseObjectId(body.employee_id, "employee_id", "Employee");
@@ -167,32 +313,70 @@ export const attendanceService = {
     if (shiftRaw) {
       await assertCompanyDocument(companyId, HrmShiftModel, shiftRaw, "Shift");
       body.shift_id = companyObjectId(shiftRaw);
+    } else {
+      // The grid flow doesn't pick a shift — default it from the employee's own
+      // shift so reports still have one when available.
+      const profile = await HrmEmployeeModel.findOne({
+        ...companyScope(companyId),
+        employee_user_id: employee_id,
+      })
+        .select("shift_id")
+        .lean();
+      if (profile?.shift_id) body.shift_id = profile.shift_id;
     }
     const date = startOfDay(parseDate(body.date, "date"));
+    const status = resolveAttendanceStatus(body.status, "present");
+    const skipClockGate = NON_CLOCK_STATUSES.has(status);
     const existing = await HrmAttendanceModel.findOne({
       ...companyScope(companyId),
       employee_id,
       date
     });
     if (existing) {
-      if (body.status !== undefined) {
-        existing.status = assertEnumValue(body.status, ATTENDANCE_STATUS, "status") as never;
+      // Full upsert: the attendance grid edits clock in/out (+ notes/status) of
+      // whatever day cell is clicked, so an existing row must accept those too —
+      // previously only status was updated here.
+      const inAt = combineDateTime(date, body.clock_in);
+      const outAt = combineDateTime(date, body.clock_out);
+      // Marking leave / off day / absent does not require clock eligibility.
+      // Present/half-day still cannot clock on holiday/approved-leave/weekend.
+      if (!skipClockGate && (inAt || outAt)) {
+        await assertCanClockIn(companyId, employee_id, date);
       }
+      existing.status = status as never;
+      if (skipClockGate) {
+        existing.clock_in = null as never;
+        existing.clock_out = null as never;
+        existing.total_hour = 0;
+      } else {
+        if (inAt) existing.clock_in = inAt;
+        if (outAt) existing.clock_out = outAt;
+        if (existing.clock_in && existing.clock_out) {
+          existing.total_hour =
+            Math.round(((existing.clock_out.getTime() - existing.clock_in.getTime()) / 3600000) * 100) / 100;
+        }
+      }
+      if (body.notes !== undefined) existing.notes = String(body.notes);
       await existing.save();
       return { action: "updated" as const, data: formatAttendanceDoc(existing) };
     }
 
-    await assertCanClockIn(companyId, employee_id, date);
+    if (!skipClockGate) {
+      await assertCanClockIn(companyId, employee_id, date);
+    }
+    const clockIn = skipClockGate ? undefined : (combineDateTime(date, body.clock_in) ?? new Date());
+    const clockOut = skipClockGate ? undefined : combineDateTime(date, body.clock_out);
     const doc = await HrmAttendanceModel.create({
       employee_id,
       shift_id: body.shift_id,
       date,
-      clock_in: body.clock_in ? new Date(String(body.clock_in)) : new Date(),
-      clock_out: body.clock_out ? new Date(String(body.clock_out)) : undefined,
-      status:
-        body.status !== undefined
-          ? (assertEnumValue(body.status, ATTENDANCE_STATUS, "status") as never)
-          : "present",
+      clock_in: clockIn,
+      clock_out: clockOut,
+      total_hour:
+        clockIn && clockOut
+          ? Math.round(((clockOut.getTime() - clockIn.getTime()) / 3600000) * 100) / 100
+          : 0,
+      status: status as never,
       notes: body.notes,
       user_id: companyScope(companyId).user_id,
       creator_id: creatorObjectId(req),
@@ -332,10 +516,22 @@ export const attendanceService = {
     if (body.employee_id) row.employee_id = String(body.employee_id) as never;
     if (body.shift_id) row.shift_id = body.shift_id as never;
     if (body.date) row.date = startOfDay(parseDate(body.date, "date"));
-    if (body.clock_in) row.clock_in = new Date(String(body.clock_in));
-    if (body.clock_out) row.clock_out = new Date(String(body.clock_out));
+    const baseDate = row.date ?? new Date();
+    if (body.clock_in) {
+      const inAt = combineDateTime(baseDate, body.clock_in);
+      if (inAt) row.clock_in = inAt;
+    }
+    if (body.clock_out) {
+      const outAt = combineDateTime(baseDate, body.clock_out);
+      if (outAt) row.clock_out = outAt;
+    }
     if (body.status !== undefined) {
-      row.status = assertEnumValue(body.status, ATTENDANCE_STATUS, "status") as never;
+      row.status = resolveAttendanceStatus(body.status) as never;
+      if (NON_CLOCK_STATUSES.has(String(row.status))) {
+        row.clock_in = null as never;
+        row.clock_out = null as never;
+        row.total_hour = 0;
+      }
     }
     if (body.notes !== undefined) row.notes = String(body.notes);
     if (row.clock_in && row.clock_out) {
@@ -346,16 +542,7 @@ export const attendanceService = {
     return formatAttendanceDoc(row);
   },
 
-  async remove(req: AuthRequest, id: string) {
-    const companyId = resolveCompanyId(req);
-    const updated = await HrmAttendanceModel.findOneAndUpdate(
-      { _id: id, ...companyScope(companyId) },
-      { isDeleted: true },
-      { new: true }
-    );
-    if (!updated) throw new AppError(httpStatus.NOT_FOUND, "Attendance not found");
-    return { _id: id };
-  },
+  remove,
 
   async history(req: AuthRequest, body: Record<string, unknown>) {
     const companyId = resolveCompanyId(req);

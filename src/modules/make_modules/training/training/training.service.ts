@@ -22,6 +22,7 @@ import { TTraining } from "./training.interface";
 import { TrainingTypeModel } from "../trainingType/trainingType.model";
 import { TrainerModel } from "../trainer/trainer.model";
 import { TrainingTaskModel } from "../trainingTask/trainingTask.model";
+import { withBulkDeleteAuthId } from "../../../../utils/bulkDelete";
 
 const P = permission.training.training;
 const STATUSES = ["scheduled", "ongoing", "completed", "cancelled"];
@@ -138,7 +139,6 @@ const update = async (req: AuthRequest, id: string, body: Record<string, unknown
   const payload = await prepare(body, req);
   delete payload.user_id;
   delete payload.creator_id;
-  delete payload.isDeleted;
   const companyId = resolveCompanyId(req);
   const updated = await TrainingModel.findOneAndUpdate(
     { _id: id, ...companyScope(companyId) },
@@ -149,7 +149,7 @@ const update = async (req: AuthRequest, id: string, body: Record<string, unknown
   return format(updated as unknown as TTraining);
 };
 
-const remove = async (req: AuthRequest, id: string) => {
+const removeOne = async (req: AuthRequest, id: string) => {
   await getOwned(req, id);
   const companyId = resolveCompanyId(req);
   await TrainingModel.findOneAndUpdate(
@@ -158,5 +158,7 @@ const remove = async (req: AuthRequest, id: string) => {
   );
   return { _id: id };
 };
+
+const remove = withBulkDeleteAuthId(removeOne);
 
 export const trainingService = { create, list, single, update, remove, getOwned };

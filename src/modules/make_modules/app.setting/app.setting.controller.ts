@@ -8,7 +8,9 @@ import { TSettingType } from "./app.setting.interface";
 import { Types } from "mongoose";
 import { settingService } from "./app.setting.service";
 import { activitiesService } from "../activities/activities.service";
-import { ActivitiesType } from "../activities/activities.interface";
+import { ActivityAction } from "../activities/activities.interface";
+import { ActivityModule } from "../../../utils/activityModules";
+import { activityActors } from "../../../utils/activityContext";
 
 //  GET Setting
 const getSetting = catchAsync(async (req: AuthRequest, res: Response) => {
@@ -61,7 +63,13 @@ const updateSetting = catchAsync(async (req: AuthRequest, res: Response) => {
     message: "Setting updated successfully",
     data,
   });
-  await activitiesService.activitiesCreateDB({ user_id: req?.user?._id as Types.ObjectId,title: `Setting Updated`, type: ActivitiesType.Updated }); 
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.app_setting,
+    entity_ids: [req.user!._id as Types.ObjectId],
+    action: ActivityAction.updated,
+    title: `Setting ${type}${subType ? `.${subType}` : ""} Updated`,
+  });
 });
 //  RESET Setting to defaults (whole, by type, or by type+subType)
 const resetSetting = catchAsync(async (req: AuthRequest, res: Response) => {
@@ -77,7 +85,13 @@ const resetSetting = catchAsync(async (req: AuthRequest, res: Response) => {
     message: "Setting reset to default successfully",
     data,
   });
-  await activitiesService.activitiesCreateDB({ user_id: req?.user?._id as Types.ObjectId, title: `Setting Reset`, type: ActivitiesType.Updated });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.app_setting,
+    entity_ids: [req.user!._id as Types.ObjectId],
+    action: ActivityAction.updated,
+    title: `Setting ${type ?? "all"}${subType ? `.${subType}` : ""} Reset`,
+  });
 });
 
 export const appSettingController = {

@@ -3,7 +3,7 @@ import moment from "moment";
 import { Types } from "mongoose";
 import AppError from "../../../errors/AppError";
 import { UserModel } from "../../basic_modules/user/user.model";
-import { role } from "../../../utils/role";
+import { role, CUSTOMER_ROLE_SET } from "../../../utils/role";
 import {
   BugStageModel,
   ProjectModel,
@@ -216,7 +216,7 @@ export const getStaffUsers = async (companyId: string) => {
 
 export const getClientUsers = async (ids?: string[]) => {
   const filter: Record<string, unknown> = {
-    role: role.customer,
+    role: { $in: [...CUSTOMER_ROLE_SET] },
     isDeleted: false,
   };
   if (ids?.length) filter._id = { $in: ids };

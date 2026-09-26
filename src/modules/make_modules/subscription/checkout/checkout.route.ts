@@ -13,5 +13,6 @@ router.get("/checkout/cancel", checkoutController.checkoutCancel);
 router.post("/assign-free", authMiddleware(role.company), checkoutController.assignFree);
 router.post("/start-trial", authMiddleware(role.company), checkoutController.startTrial);
 router.get("/my-subscription",authMiddleware(role.company, role.hr, role.staff),checkoutController.mySubscription);
+router.post("/cancel", authMiddleware(role.company), checkoutController.cancelSubscription);
 
 export const checkoutRoutes = router;

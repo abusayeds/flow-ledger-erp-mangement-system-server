@@ -28,7 +28,7 @@ export type TInvoiceReturn = {
   status?: string;
   credit_note_id?: Types.ObjectId;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 };

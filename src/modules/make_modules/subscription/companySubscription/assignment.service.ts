@@ -59,6 +59,8 @@ export const assignPlan = async (
     end_date: computeEndDate(billingCycle, plan.trial_days),
     is_trial: billingCycle === "trial",
     status: "active" as const,
+    auto_renew: true,
+    cancelled_at: null,
   };
 
   const sub = await CompanySubscriptionModel.findOneAndUpdate(

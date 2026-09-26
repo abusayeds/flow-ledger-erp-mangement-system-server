@@ -198,6 +198,7 @@ export enum pdfTypes {
   Payment_Received = "Payment_Received",
   Payment_Made = "Payment_Made",
   Debit_Note = "Debit_Note",
+  Expense = "Expense",
   Statement = "Statement",
   Packing_Slip = "Packing_Slip",
   Delivery_Note = "Delivery_Note"

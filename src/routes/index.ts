@@ -7,12 +7,19 @@ import uploadRouter from "../fileUpload/route";
 import { statusRoutes } from "../modules/make_modules/status/status.route";
 import { TermsRoutes } from "../modules/make_modules/terms/terms.route";
 import { PDFRoutes } from "../modules/make_modules/pdf.generator/pdf.routes";
+import { uploadRoutes } from "../modules/make_modules/upload/upload.route";
 import { settingHubRoutes } from "../modules/make_modules/setting/setting.route";
 import { customerRoutes } from "../modules/make_modules/customer/customer.route";
+import { customerRestRoutes } from "../modules/make_modules/customer/customer.rest.route";
 import { vendorRoutes } from "../modules/make_modules/vendor/vendor.route";
 import { productRoutes } from "../modules/make_modules/product/product.route";
 import { serviceRoutes } from "../modules/make_modules/service/service.route";
 import { invoiceRoutes } from "../modules/make_modules/invoice/invoice.route";
+import { contractRoutes } from "../modules/make_modules/contract/contract.route";
+import { companyRegisterRoutes } from "../modules/make_modules/companyRegister/companyRegister.route";
+import { referralRoutes } from "../modules/make_modules/referral/referral.route";
+import { superadminRoutes } from "../modules/make_modules/superadmin/superadmin.route";
+import { invoiceRestRoutes } from "../modules/make_modules/invoice/invoice.rest.route";
 import { invoiceReturnRoutes } from "../modules/make_modules/invoice/invoiceReturn/invoiceReturn.route";
 import { salespersonRoutes } from "../modules/make_modules/invoice/salesperson/salesperson.route";
 import { salesReceiptRoutes } from "../modules/make_modules/salesReceipt/salesReceipt.route";
@@ -36,14 +43,24 @@ import { doubleEntryRoutes } from "../modules/make_modules/doubleEntry/doubleEnt
 import { hrmRoutes } from "../modules/make_modules/hrm/hrm.route";
 import { categoryRoutes } from "../modules/make_modules/product/category/category.route";
 import { taxRoutes } from "../modules/make_modules/product/tax/tax.route";
+import { taxGroupRoutes } from "../modules/make_modules/product/taxGroup/taxGroup.route";
 import { performanceRoutes } from "../modules/make_modules/performance/performance.route";
 import { trainingRoutes } from "../modules/make_modules/training/training.route";
 import { recruitmentRoutes } from "../modules/make_modules/recruitment/recruitment.route";
 import { dashboardRoutes } from "../modules/make_modules/dashboard/dashboard.route";
+import { posRoutes } from "../modules/make_modules/pos/pos.route";
+import { timeLogRoutes } from "../modules/make_modules/timeLog/timeLog.route";
+import { crmRoutes } from "../modules/make_modules/crm/crm.route";
+import { formBuilderRoutes } from "../modules/make_modules/formBuilder/formBuilder.route";
+import { supportRoutes } from "../modules/make_modules/support/support.route";
+import { liveChatRoutes } from "../modules/make_modules/liveChat/liveChat.route";
+import { activitiesRoutes } from "../modules/make_modules/activities/activities.route";
+import { documentEmailRoutes } from "../modules/make_modules/documentEmail/documentEmail.route";
+
+import { impersonationReadonlyGuard } from "../middlewares/impersonationGuard";
 
 const router = express.Router();
-
-// Feature-gate every /api/v1/:module/* request by the company's active plan (best-effort; superadmin/legacy bypass).
+router.use(impersonationReadonlyGuard);
 router.use(subscriptionGateway);
 
 router.use("/api/v1/file-upload", uploadRouter);
@@ -53,14 +70,22 @@ router.use("/api/v1/subscription", subscriptionRoutes);
 router.use("/api/v1/status", statusRoutes);
 router.use("/api/v1/terms", TermsRoutes );
 router.use("/api/v1/pdf", PDFRoutes );
+router.use("/api/v1/upload", uploadRoutes );
 router.use("/api/v1/setting", settingHubRoutes );
 router.use("/api/v1/customer", customerRoutes );
+router.use("/api/v1/customers", customerRestRoutes ); // REST alias for web frontend
 router.use("/api/v1/vendor", vendorRoutes );
 router.use("/api/v1/product", productRoutes );
 router.use("/api/v1/service", serviceRoutes );
 router.use("/api/v1/category", categoryRoutes );
 router.use("/api/v1/tax", taxRoutes );
+router.use("/api/v1/tax-group", taxGroupRoutes );
 router.use("/api/v1/invoice", invoiceRoutes);
+router.use("/api/v1/contract", contractRoutes);
+router.use("/api/v1/company-register", companyRegisterRoutes);
+router.use("/api/v1/referral", referralRoutes);
+router.use("/api/v1/superadmin", superadminRoutes);
+router.use("/api/v1/invoices", invoiceRestRoutes); // REST alias for web frontend
 router.use("/api/v1/invoice-return", invoiceReturnRoutes);
 router.use("/api/v1/salesperson", salespersonRoutes);
 router.use("/api/v1/sales-receipt", salesReceiptRoutes);
@@ -87,5 +112,13 @@ router.use("/api/v1/performance", performanceRoutes);
 router.use("/api/v1/training", trainingRoutes);
 router.use("/api/v1/recruitment", recruitmentRoutes);
 router.use("/api/v1/dashboard", dashboardRoutes);
+router.use("/api/v1/pos", posRoutes);
+router.use("/api/v1/time-log", timeLogRoutes);
+router.use("/api/v1/crm", crmRoutes);
+router.use("/api/v1/form-builder", formBuilderRoutes);
+router.use("/api/v1/support", supportRoutes);
+router.use("/api/v1/live-chat", liveChatRoutes);
+router.use("/api/v1/activities", activitiesRoutes);
+router.use("/api/v1/document-email", documentEmailRoutes);
 
 export default router;

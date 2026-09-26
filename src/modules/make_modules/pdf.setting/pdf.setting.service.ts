@@ -24,7 +24,7 @@ const PdfSettingUpdateDB = async (
   validatePdfSettingEnums(payload as Record<string, unknown>);
   const result = await PDFSettingModel.findOneAndUpdate({ pdfType, user_id }, payload, {
     new: true,
-    runValidators: true,
+    runValidators: true
   });
   return result;
 };
@@ -33,11 +33,16 @@ const PdfSettingGetDB = async (pdfType: string, user_id: string) => {
   if (!pdfType) {
     throw new AppError(httpStatus.BAD_REQUEST, "pdfType is required !");
   }
-  const result = await PDFSettingModel.findOne({ pdfType, user_id }).lean();
-  if (!result) {
-    throw new AppError(httpStatus.NOT_FOUND, "PDF Setting not found");
-  }
-  return result;
+   if(pdfType === "all") {
+    const result = await PDFSettingModel.find({ user_id }).lean();
+    return result;
+   } else {
+    const result = await PDFSettingModel.findOne({ pdfType, user_id }).lean();
+    if (!result) {
+      throw new AppError(httpStatus.NOT_FOUND, "PDF Setting not found");
+    }
+    return result;
+   }
 };
 
 // Reset a pdfType's setting back to the seed defaults (same values seeded on login).

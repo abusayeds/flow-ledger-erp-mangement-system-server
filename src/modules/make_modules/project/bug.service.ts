@@ -20,6 +20,7 @@ import {
   toListQuery,
 } from "./project.utils";
 import { TTaskPriority } from "./project.interface";
+import { withBulkDeleteIdSecond } from "../../../utils/bulkDelete";
 
 const listBugs = async (
   userId: string,
@@ -71,8 +72,7 @@ const createOrUpdateBug = async (
   if (body.bug_id) {
     const bug = await ProjectBugModel.findOne({
       _id: body.bug_id,
-      user_id: userId,
-      isDeleted: false,
+      user_id: userId
     });
     if (!bug) throw new AppError(httpStatus.NOT_FOUND, "Bug not found");
     bug.title = String(body.title);
@@ -88,7 +88,7 @@ const createOrUpdateBug = async (
       priority: bug.priority,
       stage_id: bug.stage_id,
       project_id: bug.project_id,
-      assigned_users: await mapAssignedUsers(bug.assigned_to),
+      assigned_users: await mapAssignedUsers(bug.assigned_to)
     });
   }
 
@@ -96,7 +96,7 @@ const createOrUpdateBug = async (
   let stageId = body.stage_id ? new Types.ObjectId(String(body.stage_id)) : undefined;
   if (!stageId) {
     await ensureDefaultBugStages(userId, creatorId);
-    const first = await BugStageModel.findOne({ user_id: userId, isDeleted: false }).sort({ order: 1 });
+    const first = await BugStageModel.findOne({ user_id: userId }).sort({ order: 1 });
     stageId = first?._id as Types.ObjectId | undefined;
   }
 
@@ -107,12 +107,11 @@ const createOrUpdateBug = async (
     assigned_to: assigned,
     priority: (body.priority as TTaskPriority) || "Medium",
     stage_id: stageId,
-    creator_id: creatorId,
-    isDeleted: false,
+    creator_id: creatorId
   });
 
   await logProjectActivity(creatorId, new Types.ObjectId(String(body.project_id)), "Create Bug", {
-    title: bug.title,
+    title: bug.title
   });
 
   return formatProjectResponse({
@@ -122,7 +121,7 @@ const createOrUpdateBug = async (
     priority: bug.priority,
     stage_id: bug.stage_id,
     project_id: bug.project_id,
-    assigned_users: await mapAssignedUsers(bug.assigned_to),
+    assigned_users: await mapAssignedUsers(bug.assigned_to)
   });
 };
 
@@ -146,7 +145,7 @@ const bugDetails = async (
   });
 };
 
-const deleteBug = async (userId: string, bugId: string) => {
+const deleteBugOne = async (userId: string, bugId: string) => {
   const bug = await ProjectBugModel.findOneAndUpdate(
     { _id: bugId, user_id: userId, isDeleted: false },
     { isDeleted: true },
@@ -157,10 +156,10 @@ const deleteBug = async (userId: string, bugId: string) => {
 };
 
 const stageUpdate = async (userId: string, creatorId: Types.ObjectId, bugId: string, stageId: string) => {
-  const bug = await ProjectBugModel.findOne({ _id: bugId, user_id: userId, isDeleted: false });
+  const bug = await ProjectBugModel.findOne({ _id: bugId, user_id: userId });
   if (!bug) throw new AppError(httpStatus.NOT_FOUND, "Bug not found");
   const oldStage = bug.stage_id ? await BugStageModel.findById(bug.stage_id) : null;
-  const newStage = await BugStageModel.findOne({ _id: stageId, user_id: userId, isDeleted: false });
+  const newStage = await BugStageModel.findOne({ _id: stageId, user_id: userId });
   if (!newStage) throw new AppError(httpStatus.NOT_FOUND, "Stage not found");
   if (String(bug.stage_id) !== stageId) {
     bug.stage_id = newStage._id as Types.ObjectId;
@@ -168,7 +167,7 @@ const stageUpdate = async (userId: string, creatorId: Types.ObjectId, bugId: str
     await logProjectActivity(creatorId, bug.project_id, "Move Bug", {
       title: bug.title,
       old_status: oldStage?.name ?? "Unknown",
-      new_status: newStage.name,
+      new_status: newStage.name
     });
   }
 };
@@ -194,7 +193,7 @@ const commentCreate = async (userId: string, bugId: string, comment: string) => 
   return formatProjectResponse(doc);
 };
 
-const commentDelete = async (userId: string, commentId: string) => {
+const commentDeleteOne = async (userId: string, commentId: string) => {
   const doc = await BugCommentModel.findOneAndUpdate(
     { _id: commentId, user_id: userId, isDeleted: false },
     { isDeleted: true },
@@ -203,6 +202,10 @@ const commentDelete = async (userId: string, commentId: string) => {
   if (!doc) throw new AppError(httpStatus.NOT_FOUND, "Comment not found");
   return formatProjectResponse(doc);
 };
+
+const commentDelete = withBulkDeleteIdSecond(commentDeleteOne);
+
+const deleteBug = withBulkDeleteIdSecond(deleteBugOne);
 
 export const bugService = {
   listBugs,

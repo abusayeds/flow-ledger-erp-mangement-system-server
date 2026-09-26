@@ -36,7 +36,19 @@ const sendEmail = catchAsync(async (req: AuthRequest, res) => {
 
 const downloadOfferLetter = catchAsync(async (req: AuthRequest, res) => {
   const result = await offerService.downloadOfferLetter(req, req.params.id);
-  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Offer letter retrieved", data: result });
+
+  if (req.query.format === "html" && result.html) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `inline; filename="${result.filename}"`);
+    return res.status(httpStatus.OK).send(result.html);
+  }
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Offer letter retrieved successfully",
+    data: result,
+  });
 });
 
 const convertToEmployee = catchAsync(async (req: AuthRequest, res) => {

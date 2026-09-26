@@ -61,12 +61,37 @@ const remove = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
+/** Brings a soft-deleted purchase invoice back — the counterpart of `remove`. */
+const restore = catchAsync(async (req: AuthRequest, res) => {
+  const result = await purchaseInvoiceService.restoreDB(req.user?._id as string, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Purchase invoice restored successfully",
+    data: result,
+  });
+});
+
 const post = catchAsync(async (req: AuthRequest, res) => {
   const result = await purchaseInvoiceService.postDB(req.user?._id as string, req.params.id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Purchase invoice posted successfully",
+    data: result,
+  });
+});
+
+const updateStatus = catchAsync(async (req: AuthRequest, res) => {
+  const result = await purchaseInvoiceService.updateStatusDB(
+    req.user?._id as string,
+    req.params.id,
+    (req.body?.status ?? "") as string,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Purchase invoice status updated successfully",
     data: result,
   });
 });
@@ -80,4 +105,4 @@ const print = catchAsync(async (req: AuthRequest, res) => {
   generatePurchaseInvoicePDF(invoice, settings, res);
 });
 
-export const purchaseInvoiceController = { create, getAll, getSingle, update, remove, post, print };
+export const purchaseInvoiceController = { create, getAll, getSingle, update, updateStatus, remove, restore, post, print };

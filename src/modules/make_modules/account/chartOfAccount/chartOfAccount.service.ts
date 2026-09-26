@@ -4,6 +4,7 @@ import queryBuilder from "../../../../builder/queryBuilder";
 import { companyScope } from "../account.utils";
 import { TChartOfAccount } from "./chartOfAccount.interface";
 import { ChartOfAccountModel } from "./chartOfAccount.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const resolveLevel = async (
   userId: string,
@@ -53,8 +54,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TChartOfAcc
     const dup = await ChartOfAccountModel.findOne({
       user_id: userId,
       account_code: payload.account_code,
-      isDeleted: false,
-      _id: { $ne: id },
+      _id: { $ne: id }
     });
     if (dup) throw new AppError(httpStatus.CONFLICT, "Account code already exists");
   }
@@ -66,7 +66,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TChartOfAcc
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await ChartOfAccountModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Chart of account not found");
   if (record.is_system_account) {
@@ -104,5 +104,7 @@ const getSingleDB = async (id: string, userId: string) => {
     balance: doc.current_balance ?? 0,
   };
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const chartOfAccountService = { createDB, updateDB, deleteDB, getAllDB, getSingleDB };

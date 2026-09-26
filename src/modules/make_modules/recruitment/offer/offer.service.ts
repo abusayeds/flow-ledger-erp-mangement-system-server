@@ -22,6 +22,7 @@ import { OfferModel } from "./offer.model";
 import { TOffer, offerApprovalStatuses } from "./offer.interface";
 import { UserModel } from "../../../basic_modules/user/user.model";
 import { HrmEmployeeModel } from "../../hrm/models/employee.models";
+import { offerLetterService } from "./offerLetter.service";
 
 const P = permission.recruitment.offers;
 
@@ -44,29 +45,41 @@ const populate = [
   { path: "approved_by", select: "name" },
 ];
 
-const format = (d: TOffer) => ({
-  _id: d._id,
-  candidate_id: refName(d.candidate_id, "first_name"),
-  job_id: refName(d.job_id, "title"),
-  offer_date: formatDateOnly(d.offer_date),
-  position: d.position,
-  department_id: refName(d.department_id, "department_name"),
-  salary: d.salary,
-  bonus: d.bonus ?? null,
-  equity: d.equity ?? null,
-  benefits: d.benefits ?? null,
-  start_date: formatDateOnly(d.start_date),
-  expiration_date: formatDateOnly(d.expiration_date),
-  offer_letter_path: d.offer_letter_path ?? null,
-  status: d.status,
-  response_date: formatDateOnly(d.response_date),
-  decline_reason: d.decline_reason ?? null,
-  converted_to_employee: d.converted_to_employee,
-  employee_id: d.employee_id ?? null,
-  approval_status: d.approval_status,
-  approved_by: refName(d.approved_by),
-  createdAt: d.createdAt,
-});
+const withDownloadUrl = (item: Record<string, unknown>, req?: AuthRequest) => {
+  if (!req || !item._id) return item;
+  return {
+    ...item,
+    download_url: offerLetterService.buildDownloadUrl(req, String(item._id)),
+  };
+};
+
+const format = (d: TOffer, req?: AuthRequest) =>
+  withDownloadUrl(
+    {
+      _id: d._id,
+      candidate_id: refName(d.candidate_id, "first_name"),
+      job_id: refName(d.job_id, "title"),
+      offer_date: formatDateOnly(d.offer_date),
+      position: d.position,
+      department_id: refName(d.department_id, "department_name"),
+      salary: d.salary,
+      bonus: d.bonus ?? null,
+      equity: d.equity ?? null,
+      benefits: d.benefits ?? null,
+      start_date: formatDateOnly(d.start_date),
+      expiration_date: formatDateOnly(d.expiration_date),
+      offer_letter_path: d.offer_letter_path ?? null,
+      status: d.status,
+      response_date: formatDateOnly(d.response_date),
+      decline_reason: d.decline_reason ?? null,
+      converted_to_employee: d.converted_to_employee,
+      employee_id: d.employee_id ?? null,
+      approval_status: d.approval_status,
+      approved_by: refName(d.approved_by),
+      createdAt: d.createdAt,
+    },
+    req,
+  );
 
 const base = createRecruitmentCrudService<TOffer>({
   model: OfferModel,
@@ -76,8 +89,28 @@ const base = createRecruitmentCrudService<TOffer>({
   populate,
   beforeCreate: prepare,
   beforeUpdate: prepare,
-  formatItem: format,
+  formatItem: (d) => format(d),
 });
+
+const list = async (req: AuthRequest, query: Record<string, unknown>) => {
+  const result = await base.list(req, query);
+  return {
+    ...result,
+    data: result.data.map((row) => withDownloadUrl(row as Record<string, unknown>, req)),
+  };
+};
+
+const single = async (req: AuthRequest, id: string) => format((await base.getOwned(req, id)) as unknown as TOffer, req);
+
+const create = async (req: AuthRequest, body: Record<string, unknown>) => {
+  const result = await base.create(req, body);
+  return withDownloadUrl(result as Record<string, unknown>, req);
+};
+
+const update = async (req: AuthRequest, id: string, body: Record<string, unknown>) => {
+  const result = await base.update(req, id, body);
+  return withDownloadUrl(result as Record<string, unknown>, req);
+};
 
 /** updateApprovalStatus: Approved / Rejected / Pending. Records approver. */
 const updateApprovalStatus = async (req: AuthRequest, id: string, status: unknown) => {
@@ -92,24 +125,53 @@ const updateApprovalStatus = async (req: AuthRequest, id: string, status: unknow
   doc.approval_status = s;
   doc.approved_by = creatorObjectId(req);
   await doc.save();
-  return format(doc as unknown as TOffer);
+  return format(doc as unknown as TOffer, req);
 };
 
-/** Laravel sendEmail: mark the offer letter as sent (email delivery handled by infra). */
+/** Laravel sendEmail — marks sent and returns download link for the candidate email. */
 const sendEmail = async (req: AuthRequest, id: string) => {
   const doc = await base.getOwned(req, id);
   doc.status = "Sent";
   await doc.save();
-  return format(doc as unknown as TOffer);
+
+  const letter = await offerLetterService.buildOfferLetterDocument(req, id);
+  const candidate =
+    letter?.offer?.candidate ||
+    (doc.candidate_id && typeof doc.candidate_id === "object" && "first_name" in doc.candidate_id
+      ? doc.candidate_id
+      : null);
+
+  return {
+    ...format(doc as unknown as TOffer, req),
+    email_payload: {
+      candidate_name: candidate
+        ? `${(candidate as { first_name?: string }).first_name ?? ""} ${(candidate as { last_name?: string }).last_name ?? ""}`.trim()
+        : "Candidate",
+      candidate_email:
+        candidate && typeof candidate === "object" && "email" in candidate
+          ? (candidate as { email?: string }).email
+          : null,
+      position: doc.position,
+      salary: doc.salary != null ? `$${Number(doc.salary).toLocaleString("en-US")}` : "To be discussed",
+      start_date: formatDateOnly(doc.start_date),
+      company_name: letter?.companyName ?? null,
+      download_url: letter?.download_url ?? offerLetterService.buildDownloadUrl(req, id),
+    },
+  };
 };
 
-/** Laravel downloadOfferLetter: return the stored offer-letter file path. */
+/**
+ * Laravel downloadOfferLetter — template merge + HTML (or uploaded file path if set).
+ */
 const downloadOfferLetter = async (req: AuthRequest, id: string) => {
-  const doc = await base.getOwned(req, id);
-  if (!doc.offer_letter_path) {
-    throw new AppError(httpStatus.NOT_FOUND, "No offer letter is attached to this offer");
+  await base.getOwned(req, id);
+  const document = await offerLetterService.buildOfferLetterDocument(req, id);
+
+  if (!document) {
+    throw new AppError(httpStatus.NOT_FOUND, "Offer not found");
   }
-  return { offer_letter_path: doc.offer_letter_path };
+
+  return document;
 };
 
 /**
@@ -163,11 +225,15 @@ const convertToEmployee = async (req: AuthRequest, id: string, body: Record<stri
   candidate.status = "Hired";
   await candidate.save();
 
-  return { offer: format(offer as unknown as TOffer), employee };
+  return { offer: format(offer as unknown as TOffer, req), employee };
 };
 
 export const offerService = {
   ...base,
+  list,
+  single,
+  create,
+  update,
   updateApprovalStatus,
   sendEmail,
   downloadOfferLetter,

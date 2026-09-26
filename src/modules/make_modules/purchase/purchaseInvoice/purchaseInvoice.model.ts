@@ -1,54 +1,98 @@
 import { Schema, model, Types } from "mongoose";
 import { TPurchaseInvoice, purchaseInvoiceStatus } from "./purchaseInvoice.interface";
 
-const itemTaxSchema = new Schema(
+const addressSchema = new Schema(
   {
-    tax_name: { type: String, required: true },
-    tax_rate: { type: Number, default: 0 },
+    street: { type: String, required: true },
+    street2: { type: String },
+    city: { type: String, required: true },
+    state: { type: String },
+    zip: { type: String },
+    country: { type: String, required: true },
   },
   { _id: false }
 );
 
-const itemSchema = new Schema(
+/** Keep line _id for purchase returns (original_invoice_item_id). */
+const productSchema = new Schema(
   {
-    product_id: { type: Types.ObjectId, ref: "Product", required: true },
-    quantity: { type: Number, required: true, min: 1 },
-    unit_price: { type: Number, required: true, min: 0 },
-    discount_percentage: { type: Number, default: 0 },
-    discount_amount: { type: Number, default: 0 },
-    tax_percentage: { type: Number, default: 0 },
-    tax_amount: { type: Number, default: 0 },
-    total_amount: { type: Number, default: 0 },
-    taxes: { type: [itemTaxSchema], default: [] },
+    product_id: { type: Types.ObjectId, ref: "Product" },
+    product_name: { type: String },
+    description: { type: String },
+    quantity: { type: Number, required: true },
+    rate: { type: Number, required: true },
+    tax: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    amount: { type: Number, required: true },
   }
-  // keep _id on items so purchase returns can reference original_invoice_item_id
+);
+
+const serviceSchema = new Schema(
+  {
+    service_id: { type: Types.ObjectId, ref: "Service" },
+    service_name: { type: String },
+    quantity: { type: Number },
+    rate: { type: Number },
+    tax: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    amount: { type: Number },
+  },
+  { _id: false }
 );
 
 const purchaseInvoiceSchema = new Schema<TPurchaseInvoice>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    invoice_number: { type: String },
-    invoice_date: { type: Date, required: true },
-    due_date: { type: Date, required: true },
-    vendor_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    vendor_id: { type: Schema.Types.ObjectId, ref: "User" },
+    vendor_name: { type: String },
     warehouse_id: { type: Schema.Types.ObjectId, ref: "Warehouse" },
-    items: { type: [itemSchema], default: [] },
-    subtotal: { type: Number, default: 0 },
-    tax_amount: { type: Number, default: 0 },
-    discount_amount: { type: Number, default: 0 },
-    total_amount: { type: Number, default: 0 },
+    invoice_number: { type: String },
+    currency: { type: String },
+    date: { type: Date },
+    due_date: { type: Date },
+    sub_title: { type: String },
+    po: { type: Schema.Types.Mixed },
+    shipping_method: { type: String },
+    payment_method: [{ type: String }],
+    discount_before_tax: { type: Number, default: 0 },
+    billing_address: { type: addressSchema },
+    shipping_address: { type: addressSchema },
+    product: [productSchema],
+    service: [serviceSchema],
+    terms_and_conditions: { type: String },
+    notes: { type: String },
+    internal_notes: { type: String },
+    Attachment: { type: String },
+    // Captured vendor signature image path (rendered in the PO PDF / detail panel).
+    signature: { type: String },
+    status: { type: String, enum: purchaseInvoiceStatus, default: "draft" },
+    sub_total: { type: Number, default: 0 },
+    deposit: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    shipping_cost: { type: Number, default: 0 },
+    inline_discount: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 },
+    tax_breakdown: {
+      type: [
+        {
+          _id: false,
+          name: { type: String },
+          rate: { type: Number, default: 0 },
+          base: { type: Number, default: 0 },
+          amount: { type: Number, default: 0 },
+        },
+      ],
+      default: [],
+    },
+    total: { type: Number, default: 0 },
     paid_amount: { type: Number, default: 0 },
     debit_note_applied: { type: Number, default: 0 },
     balance_amount: { type: Number, default: 0 },
-    status: { type: String, enum: purchaseInvoiceStatus, default: "draft" },
     payment_terms: { type: String },
-    notes: { type: String },
     isDeleted: { type: Boolean, default: false },
+    isArchive: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-export const PurchaseInvoiceModel = model<TPurchaseInvoice>(
-  "PurchaseInvoice",
-  purchaseInvoiceSchema
-);
+export const PurchaseInvoiceModel = model<TPurchaseInvoice>("PurchaseInvoice", purchaseInvoiceSchema);

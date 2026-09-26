@@ -116,22 +116,19 @@ export const createBudgetMonitoring = async (
 export const updateBudgetSpending = async (budgetId: string, userId: string, creatorId?: Types.ObjectId) => {
   const budget = await BudgetModel.findOne({
     _id: budgetId,
-    ...companyScope(userId),
-    isDeleted: false,
+    ...companyScope(userId)
   }).populate("period_id");
   if (!budget) return null;
 
   const period = await BudgetPeriodModel.findOne({
     _id: budgetPeriodId(budget),
-    ...companyScope(userId),
-    isDeleted: false,
+    ...companyScope(userId)
   });
   if (!period) return null;
 
   const allocations = await BudgetAllocationModel.find({
     budget_id: budget._id,
-    ...companyScope(userId),
-    isDeleted: false,
+    ...companyScope(userId)
   });
 
   for (const allocation of allocations) {

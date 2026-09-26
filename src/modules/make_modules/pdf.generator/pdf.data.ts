@@ -14,12 +14,20 @@ import { DeliveryChallanModel } from "../deliveryChallan/deliveryChallan.model";
 import { BillModel } from "../bill/bill.model";
 import { CreditNoteModel } from "../creditNote/creditNote.model";
 import { DebitNoteModel } from "../debitNote/debitNote.model";
+import { ExpensesModel } from "../expenses/expenses.model";
+import { PurchaseInvoiceModel } from "../purchase/purchaseInvoice/purchaseInvoice.model";
+import { PaymentReceivedModel } from "../paymentReceived/paymentReceived.model";
+import { PaymentModel } from "../addPayment/payment.model";
+import { VendorPaymentModel } from "../account/vendorPayment/vendorPayment.model";
+import { PaymentMethodModel } from "../setting/paymentMethod/paymentMethod.model";
+import { SignatureModel } from "../setting/signature/signature.model";
 
 export const NA = "N/A";
 
 type DocConfig = { model: any; party: "customer_id" | "vendor_id"; title: string; billLabel: string };
 
 // type → which model / party / header title / "… To:" label
+// NOTE: Payment receipt uses PaymentModel via payment.receipt.data.ts (not invoice-style).
 const DOC_CONFIG: Record<string, DocConfig> = {
   Invoice:          { model: InvoiceModel,         party: "customer_id", title: "INVOICE",          billLabel: "Invoice To:" },
   Sales_Receipt:    { model: SalesReceiptModel,    party: "customer_id", title: "SALES RECEIPT",    billLabel: "Receipt To:" },
@@ -29,9 +37,16 @@ const DOC_CONFIG: Record<string, DocConfig> = {
   Bill:             { model: BillModel,            party: "vendor_id",   title: "BILL",             billLabel: "Bill From:" },
   Credit_Note:      { model: CreditNoteModel,      party: "customer_id", title: "CREDIT NOTE",      billLabel: "Credit To:" },
   Debit_Note:       { model: DebitNoteModel,       party: "vendor_id",   title: "DEBIT NOTE",       billLabel: "Debit To:" },
+  Expense:          { model: ExpensesModel,        party: "vendor_id",   title: "EXPENSE",          billLabel: "Expense To:" },
+  Purchase_Order:   { model: PurchaseInvoiceModel, party: "vendor_id",   title: "PURCHASE ORDER",   billLabel: "Order To:" },
+  // Same invoice document, different PDF title/settings (opened from invoice ⋮ menu).
+  Packing_Slip:     { model: InvoiceModel,         party: "customer_id", title: "PACKING SLIP",     billLabel: "Ship To:" },
+  Delivery_Note:    { model: InvoiceModel,         party: "customer_id", title: "DELIVERY NOTE",    billLabel: "Deliver To:" },
 };
 
 export const isSalesDoc = (type: string): boolean => Boolean(DOC_CONFIG[type]);
+
+export const getDocConfig = (type: string) => DOC_CONFIG[type] || null;
 
 // Invoice-style types wired to live data (derived from the config — no hardcoding).
 export const getSalesDocTypes = () =>
@@ -97,17 +112,24 @@ const emptyContact = () => ({
 const buildSample = (company: any, cfg: DocConfig) => ({
   docTitle: cfg.title,
   billLabel: cfg.billLabel,
+  currency: "USD",
   invoiceNumber: NA, poNumber: NA, date: NA, dueDate: NA, total: NA, outstanding: NA,
   company,
   billTo: emptyContact(),
   shipTo: { address: NA, shippingMethod: NA },
   products: [] as any[],
   services: [] as any[],
-  summary: { subTotal: 0, discount: 0, inlineDiscount: 0, shippingCost: 0, gst9on5: 0, total: 0, amountPaid: 0, returnOrder: 0, amountDue: 0 },
+  summary: { subTotal: 0, discountPercent: 0, discountAmount: 0, inlineDiscount: 0, shippingCost: 0, deposit: 0, depositDue: 0, tax: 0, taxBreakdown: [] as any[], total: 0, amountPaid: 0, returnOrder: 0, amountDue: 0 },
   termsAndConditions: NA,
   notes: NA,
   hsnSacSummary: [] as any[],
-  signature: { companyName: company.name, subtitle: "Authorized Signatory" },
+  signature: {
+    companyName: company.name,
+    subtitle: "Authorized Signatory",
+    companyImage: null,
+    image: null,
+    customerImage: null,
+  },
   qrCodeData: NA,
   paymentDetails: [] as any[],
 });
@@ -129,12 +151,112 @@ export const resolveSalesDoc = async (type: string, id: string | undefined, user
 
   if (!inv) return buildSample(company, cfg);
 
+  // Company / Authorized Signatory image from Settings → Signatures
+  // (Companies page). Separate from per-document customer signatures.
+  const companySig: any = await SignatureModel.findOne({
+    user_id: user?._id,
+    isDeleted: false,
+  })
+    .sort({ createdAt: -1 })
+    .lean()
+    .catch(() => null);
+
   const cur = inv.currency || "USD";
   const c = inv[cfg.party] || {};
+
+  // Payment history for the invoice PDF: every payment recorded against this
+  // invoice — both direct customer payments (PaymentReceived) and invoice-linked
+  // payments (addPayment) — so the PDF's "Payment Details" table is complete.
+  let paymentDetails: any[] = [];
+  const method1 = (m: any): string =>
+    txt(Array.isArray(m) ? m[0] : m) !== NA
+      ? String(Array.isArray(m) ? m[0] : m)
+      : "";
+  if (type === "Invoice") {
+    const [received, applied] = await Promise.all([
+      PaymentReceivedModel.find({ invoice_id: inv._id, user_id: user?._id, isDeleted: false })
+        .sort({ date: 1 }).lean().catch(() => [] as any[]),
+      PaymentModel.find({ invoice_id: inv._id, user_id: user?._id, isDeleted: { $ne: true } })
+        .sort({ payment_date: 1 }).lean().catch(() => [] as any[]),
+    ]);
+    const fromReceived = (received as any[]).map((p) => {
+      const raw = num(p.total ?? p.sub_total);
+      return {
+        paymentNo: txt(p.payment_number || p.invoice_number),
+        date: fmtDate(p.date),
+        rawAmount: raw,
+        amount: money(raw, cur),
+        method: method1(p.payment_method) || "Cash",
+        status: txt(p.status) !== NA ? String(p.status) : "Paid",
+      };
+    });
+    const fromApplied = (applied as any[]).map((p) => {
+      const raw = num(p.amount);
+      return {
+        paymentNo: txt(p.payment_number || p.reference_number),
+        date: fmtDate(p.payment_date),
+        rawAmount: raw,
+        amount: money(raw, cur),
+        method: method1(p.payment_method) || (txt(p.payment_type) !== NA ? String(p.payment_type) : "Cash"),
+        status: txt(p.status) !== NA ? String(p.status) : "Paid",
+      };
+    });
+    paymentDetails = [...fromReceived, ...fromApplied];
+  } else if (type === "Bill" || type === "Purchase_Order") {
+    // Vendor payments recorded against this bill / purchase order (VendorPayment
+    // allocations reference the doc via allocations.invoice_id), so the PDF
+    // shows a complete payment history the same way the Invoice does.
+    const vps = await VendorPaymentModel.find({
+      "allocations.invoice_id": inv._id,
+      user_id: user?._id,
+      isDeleted: { $ne: true },
+    }).sort({ payment_date: 1 }).lean().catch(() => [] as any[]);
+    paymentDetails = (vps as any[]).map((p) => {
+      const alloc = (p.allocations || []).find(
+        (a: any) => String(a.invoice_id) === String(inv._id),
+      );
+      const raw = num(alloc ? (alloc.applied_amount ?? alloc.allocated_amount) : p.payment_amount);
+      return {
+        paymentNo: txt(p.payment_number || p.reference_number),
+        date: fmtDate(p.payment_date),
+        rawAmount: raw,
+        amount: money(raw, cur),
+        method: method1(p.payment_method) || "Cash",
+        status: txt(p.status) !== NA ? String(p.status) : "",
+      };
+    });
+  }
+  // Payment totals for the "Payment Details" summary: what's been paid so far
+  // and the remaining balance (doc total − paid), both in the doc's currency.
+  const totalPaidNum = paymentDetails.reduce((s: number, p: any) => s + (p.rawAmount || 0), 0);
+  const paymentSummary = paymentDetails.length
+    ? { totalPaid: money(totalPaidNum, cur), balance: money(num(inv.total) - totalPaidNum, cur) }
+    : null;
+
+  // Accepted payment methods for the invoice, each joined to its configured
+  // logo so the PDF can show the method with its brand image.
+  let paymentMethods: any[] = [];
+  if (Array.isArray(inv.payment_method) && inv.payment_method.length) {
+    const methods = await PaymentMethodModel.find({ user_id: user?._id })
+      .lean().catch(() => [] as any[]);
+    const byName = new Map(
+      (methods as any[]).map((m) => [String(m.name).trim().toLowerCase(), m.logo]),
+    );
+    paymentMethods = (inv.payment_method as any[])
+      .filter(Boolean)
+      .map((n) => ({
+        name: String(n),
+        logo: byName.get(String(n).trim().toLowerCase()) || null,
+      }));
+  }
   const cbp = c.businessProfile || {};
+  // The party can be a picked contact (customer_id/vendor_id) OR a typed
+  // free-text name (customer_name/vendor_name) with no id — fall back to it so
+  // the Bill-To name isn't dropped. See party-id-optional-free-text.
+  const freeName = inv[cfg.party.replace("_id", "_name")];
 
   const billTo = {
-    name: txt(cbp.companyName || c.name),
+    name: txt(cbp.companyName || c.name || freeName),
     email: txt(c.email),
     phone: txt(c.phone),
     businessPhone: txt(c.phone),
@@ -149,7 +271,8 @@ export const resolveSalesDoc = async (type: string, id: string | undefined, user
     const prod = p.product_id || {};
     return {
       srNo: i + 1,
-      name: txt(prod.productName),
+      // Fall back to the free-text product_name when no product was picked.
+      name: txt(prod.productName || p.product_name),
       description: prod.description || "",
       hsn: txt(prod.sku),
       quantity: qty(p.quantity),
@@ -164,7 +287,8 @@ export const resolveSalesDoc = async (type: string, id: string | undefined, user
     const srv = sv.service_id || {};
     return {
       srNo: i + 1,
-      name: txt(srv.serviceName),
+      // Fall back to the free-text service_name when no service was picked.
+      name: txt(srv.serviceName || sv.service_name),
       description: srv.description || "",
       sac: NA,
       quantity: qty(sv.quantity),
@@ -178,6 +302,10 @@ export const resolveSalesDoc = async (type: string, id: string | undefined, user
   return {
     docTitle: cfg.title,
     billLabel: cfg.billLabel,
+    currency: cur,
+    // Free-text document sub-title (empty string when unset, so renderers can
+    // hide the row instead of printing a placeholder).
+    subTitle: (inv.sub_title ?? "").toString().trim(),
     invoiceNumber: txt(inv.invoice_number),
     poNumber: txt(inv.po),
     date: fmtDate(inv.date),
@@ -191,10 +319,24 @@ export const resolveSalesDoc = async (type: string, id: string | undefined, user
     services,
     summary: {
       subTotal: num(inv.sub_total),
-      discount: num(inv.discount),
+      // `discount` is the order-level percentage; discountAmount is what it
+      // works out to on the sub total (what the row should actually print).
+      discountPercent: num(inv.discount),
+      discountAmount: (num(inv.sub_total) * num(inv.discount)) / 100,
       inlineDiscount: num(inv.inline_discount),
       shippingCost: num(inv.shipping_cost),
-      gst9on5: num(inv.tax),
+      deposit: num(inv.deposit),
+      depositDue: num(inv.deposit),
+      tax: num(inv.tax),
+      // Named-tax rows (name / rate / base / amount) computed by the client.
+      taxBreakdown: Array.isArray(inv.tax_breakdown)
+        ? inv.tax_breakdown.map((t: any) => ({
+            name: txt(t?.name),
+            rate: num(t?.rate),
+            base: num(t?.base),
+            amount: num(t?.amount),
+          }))
+        : [],
       total: num(inv.total),
       amountPaid: num(inv.paid_amount),
       returnOrder: 0,
@@ -203,9 +345,23 @@ export const resolveSalesDoc = async (type: string, id: string | undefined, user
     termsAndConditions: txt(inv.terms_and_conditions),
     notes: txt(inv.notes),
     hsnSacSummary: [],
-    signature: { companyName: company.name, subtitle: "Authorized Signatory" },
-    qrCodeData: `${process.env.CLIENT_URL || "https://app.mooninvoice.com"}/${type}/${inv._id}`,
-    paymentDetails: [],
+    // Company image → Authorized Signatory. Document `inv.signature` is the
+    // optional customer signature (shown only when PDF setting contact_sign is on).
+    signature: {
+      companyName: company.name,
+      subtitle: "Authorized Signatory",
+      companyImage: companySig?.image || null,
+      image: inv.signature || null,
+      customerImage: inv.signature || null,
+    },
+    // Scanning the QR opens the document as a PDF, scoped to the owning account
+    // and addressed by its human number, e.g. https://temp-api.ssh.bd/<user_id>/invoice/16.
+    // The tenant segment is the document's user_id (what it's stored under) so the
+    // public route below can resolve it without auth. Base overridable via QR_BASE_URL.
+    qrCodeData: `${process.env.QR_BASE_URL || "https://temp-api.ssh.bd"}/${String(user?._id ?? "")}/${String(type).toLowerCase().replace(/_/g, "-")}/${encodeURIComponent(String(inv.invoice_number || inv._id))}`,
+    paymentDetails,
+    paymentSummary,
+    paymentMethods,
   };
 };
 

@@ -3,10 +3,11 @@ import { AuthRequest } from '../../../middlewares/auth';
 import catchAsync from '../../../utils/catchAsync';
 import sendResponse from '../../../utils/sendResponse';
 import { invoiceService } from './invoice.service';
-import { Types } from 'mongoose';
-import { ActivitiesType } from '../activities/activities.interface';
+import { ActivityAction } from '../activities/activities.interface';
 import { activitiesService } from '../activities/activities.service';
 import { TInvoice } from './invoice.interface';
+import { ActivityModule } from '../../../utils/activityModules';
+import { activityActors } from '../../../utils/activityContext';
 
 const create = catchAsync(async (req: AuthRequest, res) => {
   req.body.user_id = req?.user?._id;
@@ -17,10 +18,12 @@ const create = catchAsync(async (req: AuthRequest, res) => {
     message: 'Invoice created successfully.',
     data: result,
   });
-  await activitiesService.activitiesCreateDB({ 
-    user_id: req?.user?._id as Types.ObjectId, 
-    type: ActivitiesType.Created, 
-    title: 'Invoice Create' 
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.invoice,
+    entity_ids: [result._id!],
+    action: ActivityAction.created,
+    title: `Invoice ${result.invoice_number ?? result._id} Created`,
   });
 });
 
@@ -57,9 +60,11 @@ const update = catchAsync(async (req: AuthRequest, res) => {
     data: result,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Updated,
-    title: 'Invoice Update',
+    ...activityActors(req),
+    module: ActivityModule.invoice,
+    entity_ids: [result?._id ?? id],
+    action: ActivityAction.updated,
+    title: `Invoice ${result?.invoice_number ?? id} Updated`,
   });
 });
 
@@ -73,10 +78,49 @@ const remove = catchAsync(async (req: AuthRequest, res) => {
     data: null,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: req?.user?._id as Types.ObjectId,
-    type: ActivitiesType.Archived,
-    title: 'Invoice Delete',
+    ...activityActors(req),
+    module: ActivityModule.invoice,
+    entity_ids: [id],
+    action: ActivityAction.archived,
+    title: `Invoice ${id} Deleted`,
   });
 });
 
-export const invoiceController = { create, getSingle, getAll, update, remove };
+/** Brings a soft-deleted invoice back — the counterpart of `remove`. */
+const restore = catchAsync(async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const data = await invoiceService.restoreDB(id, req.user?._id as string);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'Invoice restored successfully.',
+    data,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.invoice,
+    entity_ids: [id],
+    action: ActivityAction.updated,
+    title: `Invoice ${id} Restored`,
+  });
+});
+
+const hardRemove = catchAsync(async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  await invoiceService.hardDeleteDB(id, req.user?._id as string);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'Invoice permanently deleted.',
+    data: null,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.invoice,
+    entity_ids: [id],
+    action: ActivityAction.deleted,
+    title: `Invoice ${id} Permanently Deleted`,
+  });
+});
+
+export const invoiceController = { create, getSingle, getAll, update, remove, restore, hardRemove };

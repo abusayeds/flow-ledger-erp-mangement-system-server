@@ -5,6 +5,7 @@ import { companyScope } from "../account.utils";
 import { TRevenueCategory } from "./revenueCategory.interface";
 import { RevenueCategoryModel } from "./revenueCategory.model";
 import { ChartOfAccountModel } from "../chartOfAccount/chartOfAccount.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const assertGlAccount = async (userId: string, glAccountId?: string) => {
   if (!glAccountId) return;
@@ -37,8 +38,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TRevenueCat
     const dup = await RevenueCategoryModel.findOne({
       user_id: userId,
       category_code: payload.category_code,
-      isDeleted: false,
-      _id: { $ne: id },
+      _id: { $ne: id }
     });
     if (dup) throw new AppError(httpStatus.CONFLICT, "Revenue category code already exists");
   }
@@ -47,7 +47,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TRevenueCat
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await RevenueCategoryModel.findOneAndUpdate(
     { _id: id, ...companyScope(userId) },
     { isDeleted: true },
@@ -73,5 +73,7 @@ const getAllDB = async (userId: string, query: Record<string, unknown>) => {
   const limit = Number(query.limit) || 10;
   return { rows, pagination: build.calculatePagination({ totalData, currentPage: page, limit }) };
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const revenueCategoryService = { createDB, updateDB, deleteDB, getAllDB };

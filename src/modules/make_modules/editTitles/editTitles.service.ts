@@ -11,8 +11,8 @@ const updateEditTitleDB = async (
       { user_id },
       {
         $set: {
-          titles: seedEditTitles,
-        },
+          titles: seedEditTitles
+        }
       },
       { new: true, upsert: true },
     );
@@ -23,12 +23,12 @@ const updateEditTitleDB = async (
   const result = await EditTitleModel.findOneAndUpdate(
     {
       user_id,
-      "titles._id": payload._id,
+      "titles._id": payload._id
     },
     {
       $set: {
-        "titles.$.name": payload.name,
-      },
+        "titles.$.name": payload.name
+      }
     },
     { new: true },
   );

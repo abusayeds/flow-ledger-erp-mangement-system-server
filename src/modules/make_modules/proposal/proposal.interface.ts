@@ -23,7 +23,9 @@ export type TProposal = {
   due_date?: Date;
   discount_before_tax?: number;
   product?: {
-    product_id: Types.ObjectId;
+    product_id?: Types.ObjectId;
+    product_name?: string;
+    description?: string;
     quantity: number;
     rate: number;
     tax: number;
@@ -31,7 +33,8 @@ export type TProposal = {
     amount: number;
   }[];
   service?: {
-    service_id: Types.ObjectId;
+    service_id?: Types.ObjectId;
+    service_name?: string;
     quantity: number;
     rate: number;
     tax: number;
@@ -47,6 +50,6 @@ export type TProposal = {
   tax: number;
   total: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

@@ -68,4 +68,45 @@ const remove = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
-export const purchaseReturnController = { create, getAll, getSingle, approve, complete, remove };
+const update = catchAsync(async (req: AuthRequest, res) => {
+  const result = await purchaseReturnService.updateDB(
+    req.user?._id as string,
+    req.params.id,
+    req.body
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Purchase return updated successfully",
+    data: result,
+  });
+});
+
+const updateStatus = catchAsync(async (req: AuthRequest, res) => {
+  const result = await purchaseReturnService.updateStatusDB(
+    req.user?._id as string,
+    req.params.id,
+    req.body?.status
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Purchase return status updated successfully",
+    data: result,
+  });
+});
+
+const restore = catchAsync(async (req: AuthRequest, res) => {
+  const result = await purchaseReturnService.restoreDB(
+    req.user?._id as string,
+    req.params.id
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Purchase return restored successfully",
+    data: result,
+  });
+});
+
+export const purchaseReturnController = { create, getAll, getSingle, approve, complete, remove, update, updateStatus, restore };

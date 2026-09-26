@@ -32,6 +32,7 @@ import {
   toListQuery,
 } from "./project.utils";
 import { TProject, TProjectStatus } from "./project.interface";
+import { withBulkDeleteIdSecond, runBulkDelete, parseDeleteIdsFromParam } from "../../../utils/bulkDelete";
 
 const listProjects = async (
   userId: string,
@@ -119,7 +120,7 @@ const createOrUpdateProject = async (
 
   if (projectId) {
     const project = await ProjectModel.findOneAndUpdate(
-      { _id: projectId, user_id: userId, isDeleted: false },
+      { _id: projectId, user_id: userId },
       { $set: data },
       { new: true, runValidators: true }
     );
@@ -133,7 +134,7 @@ const createOrUpdateProject = async (
   return project
 };
 
-const deleteProject = async (userId: string, projectId: string) => {
+const deleteProjectOne = async (userId: string, projectId: string) => {
   const project = await assertProject(projectId, userId);
   await ProjectTaskModel.updateMany({ project_id: project._id }, { isDeleted: true });
   await ProjectBugModel.updateMany({ project_id: project._id }, { isDeleted: true });
@@ -246,7 +247,7 @@ const inviteMembers = async (userId: string, projectId: string, userIds: string[
   }
 };
 
-const deleteMember = async (userId: string, projectId: string, memberId: string) => {
+const deleteMemberOne = async (userId: string, projectId: string, memberId: string) => {
   const project = await assertProject(projectId, userId);
   project.teamMemberIds = project.teamMemberIds.filter((id) => String(id) !== memberId);
   await project.save();
@@ -270,7 +271,7 @@ const inviteClients = async (userId: string, projectId: string, clientIds: strin
   }
 };
 
-const deleteClient = async (userId: string, projectId: string, clientId: string) => {
+const deleteClientOne = async (userId: string, projectId: string, clientId: string) => {
   const project = await assertProject(projectId, userId);
   project.clientIds = project.clientIds.filter((id) => String(id) !== clientId);
   await project.save();
@@ -415,6 +416,14 @@ const getUsers = async (userId: string) => {
     }))
   );
 };
+
+const deleteProject = withBulkDeleteIdSecond(deleteProjectOne);
+
+const deleteMember = async (userId: string, projectId: string, memberId: string) =>
+  runBulkDelete(parseDeleteIdsFromParam(memberId), (oneId) => deleteMemberOne(userId, projectId, oneId));
+
+const deleteClient = async (userId: string, projectId: string, clientId: string) =>
+  runBulkDelete(parseDeleteIdsFromParam(clientId), (oneId) => deleteClientOne(userId, projectId, oneId));
 
 export const projectService = {
   listProjects,

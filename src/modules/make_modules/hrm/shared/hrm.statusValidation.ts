@@ -39,7 +39,13 @@ export const validateWorkflowStatus = (resource: WorkflowResourceKey, status: un
   assertEnumValue(status, WORKFLOW_STATUS[resource], "status");
 
 export const LEAVE_APPLICATION_STATUS = ["pending", "approved", "rejected"] as const;
-export const ATTENDANCE_STATUS = ["present", "half day", "absent"] as const;
+export const ATTENDANCE_STATUS = [
+  "present",
+  "half day",
+  "absent",
+  "on leave",
+  "off day",
+] as const;
 export const PAYROLL_STATUS = ["draft", "processing", "completed", "cancelled"] as const;
 export const PAYROLL_ENTRY_STATUS = ["paid", "unpaid"] as const;
 export const LOAN_STATUS = ["active", "expired"] as const;

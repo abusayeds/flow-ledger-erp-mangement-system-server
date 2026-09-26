@@ -6,7 +6,7 @@ type Doc<T> = T & THrmBase & Document;
 
 export type THrmAttendance = Doc<{
   employee_id: Types.ObjectId;
-  shift_id: Types.ObjectId;
+  shift_id?: Types.ObjectId;
   date: Date;
   clock_in: Date;
   clock_out?: Date;
@@ -14,22 +14,30 @@ export type THrmAttendance = Doc<{
   total_hour?: number;
   overtime_hours?: number;
   overtime_amount?: number;
-  status: "present" | "half day" | "absent";
+  status: "present" | "half day" | "absent" | "on leave" | "off day" | "pending";
   notes?: string;
 }>;
 
 const attendanceSchema = new Schema({
   ...hrmBaseSchemaFields,
   employee_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  shift_id: { type: Schema.Types.ObjectId, ref: "HrmShift", required: true },
+  // Optional: the attendance grid records clock in/out per employee/day without
+  // a shift picker. When omitted, createManual defaults it to the employee's shift.
+  shift_id: { type: Schema.Types.ObjectId, ref: "HrmShift" },
   date: { type: Date, required: true },
-  clock_in: { type: Date, required: true },
+  // Optional for non-work statuses (on leave / off day / absent).
+  clock_in: Date,
   clock_out: Date,
   break_hour: { type: Number, default: 0 },
   total_hour: { type: Number, default: 0 },
   overtime_hours: { type: Number, default: 0 },
   overtime_amount: { type: Number, default: 0 },
-  status: { type: String, enum: ["present", "half day", "absent"], default: "present" },
+  // "pending" kept for legacy rows only — UI no longer offers it.
+  status: {
+    type: String,
+    enum: ["present", "half day", "absent", "on leave", "off day", "pending"],
+    default: "present",
+  },
   notes: String,
 }, { timestamps: true });
 attendanceSchema.index({ employee_id: 1, date: 1, user_id: 1 }, { unique: true });

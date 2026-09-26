@@ -23,4 +23,16 @@ router.get(
   expensesController.getAll
 );
 
+router.post(
+  '/edit/:id',
+  authMiddleware(role.company),
+  expensesController.update
+);
+
+router.delete(
+  '/delete/:id',
+  authMiddleware(role.company),
+  expensesController.remove
+);
+
 export const expensesRoutes = router;

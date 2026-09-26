@@ -23,6 +23,9 @@ const companySubscriptionSchema = new Schema<TCompanySubscription>(
       enum: ["active", "expired", "cancelled"],
       default: "active",
     },
+    // false = do not renew after end_date; company keeps access until then.
+    auto_renew: { type: Boolean, default: true },
+    cancelled_at: { type: Date, default: null },
   },
   { timestamps: true }
 );

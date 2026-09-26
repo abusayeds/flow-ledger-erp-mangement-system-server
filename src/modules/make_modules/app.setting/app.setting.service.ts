@@ -6,7 +6,7 @@ import { setting_seed_data } from "../../../utils/seed/seed.setting";
 
 // ── Valid subTypes per type ──────────────────────────────
 
-const DOC_SUB_TYPES = ["field_visibility", "general", "columns", "summary", "print_email"];
+const DOC_SUB_TYPES = ["field_visibility", "general", "columns", "summary", "print_email", "payment"];
 
 const SUB_TYPE_MAP: Partial<Record<TSettingType, string[]>> = {
   invoice:          DOC_SUB_TYPES,
@@ -25,7 +25,10 @@ const SUB_TYPE_MAP: Partial<Record<TSettingType, string[]>> = {
   modules:          [],
   currency_format:  [],
   printer:          [],
+  security:         [],
+  titles:           [],
   whatsApp:         [],
+  notification:     [],
   expense:          [],
   service:          [],
 };
@@ -107,18 +110,23 @@ const getSettingTypesService = () => {
   validateTypeAndSubType(type, subType);
 
   const dotNotationUpdate: Record<string, unknown> = {};
+  // `type`/`subType` are routing discriminators, not data — never persist them
+  // (matters for Mixed maps like `titles`, which would otherwise store them).
+  const isMeta = (k: string) => k === "type" || k === "subType";
 
   if (subType) {
     // ?type=invoice&subType=general
     // payload: { due_date: true, shipping_address: false }
     // → "invoice.general.due_date": true
     for (const [key, value] of Object.entries(payload)) {
+      if (isMeta(key)) continue;
       dotNotationUpdate[`${type}.${subType}.${key}`] = value;
     }
   } else {
     // ?type=invoice (subType)
     // payload: { "general.due_date": true }flat module payload
     for (const [key, value] of Object.entries(payload)) {
+      if (isMeta(key)) continue;
       dotNotationUpdate[`${type}.${key}`] = value;
     }
   }
@@ -133,8 +141,8 @@ const getSettingTypesService = () => {
   if (subType) {
     return {
       [type]: {
-        [subType]: (updated[type] as unknown as Record<string, unknown>)?.[subType],
-      },
+        [subType]: (updated[type] as unknown as Record<string, unknown>)?.[subType]
+      }
     };
   }
 

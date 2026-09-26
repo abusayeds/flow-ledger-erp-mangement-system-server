@@ -18,6 +18,7 @@ import { employeeListSearchNested } from "../shared/hrm.employeeSearch";
 import { permModule } from "../../../../utils/permissionModule";
 import { parseObjectId } from "../shared/hrm.refValidation";
 import { assertEnumValue, LEAVE_APPLICATION_STATUS } from "../shared/hrm.statusValidation";
+import { withBulkDeleteAuthId } from "../../../../utils/bulkDelete";
 
 const diffDays = (start: Date, end: Date) => {
   const ms = end.getTime() - start.getTime();
@@ -199,6 +200,19 @@ const assertLeaveBalance = async (
   }
   return snapshot;
 };
+
+const removeOne = async (req: AuthRequest, oneId: string) => {
+  const companyId = resolveCompanyId(req);
+  const updated = await HrmLeaveApplicationModel.findOneAndUpdate(
+    { _id: oneId, ...companyScope(companyId) },
+    { isDeleted: true },
+    { new: true },
+  );
+  if (!updated) throw new AppError(httpStatus.NOT_FOUND, "Leave application not found");
+  return { _id: oneId };
+};
+
+const remove = withBulkDeleteAuthId(removeOne);
 
 export const leaveService = {
   async list(req: AuthRequest, query: Record<string, unknown>) {
@@ -473,14 +487,5 @@ export const leaveService = {
     return lean(updated as Record<string, unknown>);
   },
 
-  async remove(req: AuthRequest, id: string) {
-    const companyId = resolveCompanyId(req);
-    const updated = await HrmLeaveApplicationModel.findOneAndUpdate(
-      { _id: id, ...companyScope(companyId) },
-      { isDeleted: true },
-      { new: true },
-    );
-    if (!updated) throw new AppError(httpStatus.NOT_FOUND, "Leave application not found");
-    return { _id: id };
-  },
+  remove,
 };

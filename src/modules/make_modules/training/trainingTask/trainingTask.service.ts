@@ -18,6 +18,7 @@ import {
 import { TrainingModel } from "../training/training.model";
 import { TrainingTaskModel } from "./trainingTask.model";
 import { TTrainingTask } from "./trainingTask.interface";
+import { withBulkDeleteAuthId } from "../../../../utils/bulkDelete";
 
 const P = permission.training.training;
 
@@ -140,7 +141,7 @@ const complete = async (req: AuthRequest, id: string) => {
   return format(updated as unknown as TTrainingTask);
 };
 
-const remove = async (req: AuthRequest, id: string) => {
+const removeOne = async (req: AuthRequest, id: string) => {
   await getOwned(req, id);
   const companyId = resolveCompanyId(req);
   await TrainingTaskModel.findOneAndUpdate(
@@ -149,5 +150,7 @@ const remove = async (req: AuthRequest, id: string) => {
   );
   return { _id: id };
 };
+
+const remove = withBulkDeleteAuthId(removeOne);
 
 export const trainingTaskService = { create, list, single, update, complete, remove, getOwned };

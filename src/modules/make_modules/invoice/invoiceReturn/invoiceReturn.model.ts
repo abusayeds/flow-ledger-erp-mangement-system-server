@@ -15,14 +15,14 @@ const invoiceReturnSchema = new Schema<TInvoiceReturn>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
     invoice_id: { type: Schema.Types.ObjectId, ref: "Invoice", required: true },
-    warehouse_id: { type: Schema.Types.ObjectId, ref: "Warehouse", required: true },
+    warehouse_id: { type: Schema.Types.ObjectId, ref: "Warehouse" },
     return_date: { type: Date, required: true },
     return_reason: { type: String, enum: returnReasons, required: true },
     notes: { type: String },
     status: { type: String, default: "Returned" },
     credit_note_id: { type: Schema.Types.ObjectId, ref: "CreditNote" },
     isDeleted: { type: Boolean, default: false },
-    archive: { type: Boolean, default: false },
+    isArchive: { type: Boolean, default: false },
   },
   {
     timestamps: true,

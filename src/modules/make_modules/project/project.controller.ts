@@ -7,8 +7,11 @@ import sendResponse from "../../../utils/sendResponse";
 import { TProject } from "./project.interface";
 import { toObjectIds } from "./project.model";
 import { applyCompanyUserToBody } from "./project.utils";
-import { ActivitiesType } from "../activities/activities.interface";
+import { ActivityAction } from "../activities/activities.interface";
 import { activitiesService } from "../activities/activities.service";
+import { ActivityModule } from "../../../utils/activityModules";
+import { activityActors } from "../../../utils/activityContext";
+import { joinDeleteIdsFromBody } from "../../../utils/bulkDelete";
 import { dashboardService } from "./dashboard.service";
 import { projectService } from "./project.service";
 import { milestoneService } from "./milestone.service";
@@ -120,14 +123,19 @@ const createUpdateProject = catchAsync(async (req: AuthRequest, res) => {
     data,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: creatorId(req),
-    type: req.body.project_id ? ActivitiesType.Updated : ActivitiesType.Created,
-    title: req.body.project_id ? "Project update" : "Project create",
+    ...activityActors(req),
+    module: ActivityModule.project,
+    entity_ids: [data._id!],
+    action: req.body.project_id ? ActivityAction.updated : ActivityAction.created,
+    title: req.body.project_id
+      ? `Project ${data.name} Updated`
+      : `Project ${data.name} Created`,
   });
 });
 
 const deleteProject = catchAsync(async (req: AuthRequest, res) => {
-  await projectService.deleteProject(companyId(req), String(req.body.project_id));
+  const projectIds = joinDeleteIdsFromBody(req.body, "project_id");
+  await projectService.deleteProject(companyId(req), projectIds);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -135,9 +143,11 @@ const deleteProject = catchAsync(async (req: AuthRequest, res) => {
     data: null,
   });
   await activitiesService.activitiesCreateDB({
-    user_id: creatorId(req),
-    type: ActivitiesType.Archived,
-    title: "Project delete",
+    ...activityActors(req),
+    module: ActivityModule.project,
+    entity_ids: projectIds.split(",").map((id) => new Types.ObjectId(id)),
+    action: ActivityAction.archived,
+    title: "Project Deleted",
   });
 });
 
@@ -182,7 +192,11 @@ const inviteMember = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const deleteMember = catchAsync(async (req: AuthRequest, res) => {
-  await projectService.deleteMember(companyId(req), String(req.body.project_id), String(req.body.user_id));
+  await projectService.deleteMember(
+    companyId(req),
+    String(req.body.project_id),
+    joinDeleteIdsFromBody(req.body, "user_id"),
+  );
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -202,7 +216,11 @@ const inviteClient = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const deleteClient = catchAsync(async (req: AuthRequest, res) => {
-  await projectService.deleteClient(companyId(req), String(req.body.project_id), String(req.body.client_id));
+  await projectService.deleteClient(
+    companyId(req),
+    String(req.body.project_id),
+    joinDeleteIdsFromBody(req.body, "client_id"),
+  );
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -249,7 +267,7 @@ const milestoneUpdate = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const milestoneDelete = catchAsync(async (req: AuthRequest, res) => {
-  await milestoneService.remove(companyId(req), String(req.body.milestone_id));
+  await milestoneService.remove(companyId(req), joinDeleteIdsFromBody(req.body, "milestone_id"));
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -290,7 +308,7 @@ const projectFileList = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const projectFileDelete = catchAsync(async (req: AuthRequest, res) => {
-  await fileService.remove(companyId(req), String(req.body.file_id));
+  await fileService.remove(companyId(req), joinDeleteIdsFromBody(req.body, "file_id"));
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -333,7 +351,7 @@ const taskDetails = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const taskDelete = catchAsync(async (req: AuthRequest, res) => {
-  await taskService.deleteTask(companyId(req), String(req.body.task_id));
+  await taskService.deleteTask(companyId(req), joinDeleteIdsFromBody(req.body, "task_id"));
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -389,7 +407,7 @@ const taskCommentCreate = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const taskCommentDelete = catchAsync(async (req: AuthRequest, res) => {
-  await taskService.commentDelete(companyId(req), String(req.body.comment_id));
+  await taskService.commentDelete(companyId(req), joinDeleteIdsFromBody(req.body, "comment_id"));
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -468,7 +486,7 @@ const bugDetails = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const bugDelete = catchAsync(async (req: AuthRequest, res) => {
-  await bugService.deleteBug(companyId(req), String(req.body.bug_id));
+  await bugService.deleteBug(companyId(req), joinDeleteIdsFromBody(req.body, "bug_id"));
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -514,7 +532,7 @@ const bugCommentCreate = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const bugCommentDelete = catchAsync(async (req: AuthRequest, res) => {
-  await bugService.commentDelete(companyId(req), String(req.body.comment_id));
+  await bugService.commentDelete(companyId(req), joinDeleteIdsFromBody(req.body, "comment_id"));
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,

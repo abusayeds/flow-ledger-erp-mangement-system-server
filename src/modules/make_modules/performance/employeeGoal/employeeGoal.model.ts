@@ -8,7 +8,7 @@ const employeeGoalSchema = new Schema<TPerformanceEmployeeGoal>(
     employee_id: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     goal_type_id: { type: Schema.Types.ObjectId, ref: "PerformanceGoalType", index: true },
     title: { type: String, required: true, trim: true },
-    description: { type: String, required: true },
+    description: { type: String, default: "" },
     start_date: { type: Date, required: true },
     end_date: { type: Date, required: true },
     target: { type: String, required: true },

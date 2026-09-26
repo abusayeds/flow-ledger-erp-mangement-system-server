@@ -43,7 +43,7 @@ const mapInterviewEvent = (i: any) => ({
   status: i.status || "Scheduled",
 });
 
-/* ----------------------------- COMPANY ----------------------------- */
+
 const companyDashboard = async (companyId: string) => {
   const scope = companyScope(companyId);
 
@@ -84,9 +84,59 @@ const companyDashboard = async (companyId: string) => {
       .lean()
   ).map(mapInterviewEvent);
 
+  const [intPending, intCompleted, intCancelled] = await Promise.all([
+    InterviewModel.countDocuments({ ...scope, status: "Scheduled" }),
+    InterviewModel.countDocuments({ ...scope, status: "Completed" }),
+    InterviewModel.countDocuments({ ...scope, status: "Cancelled" }),
+  ]);
+
   const latestCandidates = (
-    await CandidateModel.find(scope).sort({ createdAt: -1 }).limit(5).lean()
-  ).map((c: any) => ({ name: `${c.first_name} ${c.last_name}`, position: "N/A" }));
+    await CandidateModel.find(scope)
+      .populate("job_id", "title")
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean()
+  ).map((c: any) => ({
+    name: `${c.first_name} ${c.last_name}`,
+    position: c.job_id?.title || c.current_position || "N/A",
+    status: c.status || "New",
+    date: c.application_date || c.createdAt,
+  }));
+
+  const upcomingInterviews = (
+    await InterviewModel.find({ ...scope, status: "Scheduled" })
+      .populate("candidate_id", "first_name last_name current_position")
+      .populate("job_id", "title")
+      .sort({ scheduled_date: 1 })
+      .limit(5)
+      .lean()
+  ).map((i: any) => ({
+    candidate_name: i.candidate_id
+      ? `${i.candidate_id.first_name} ${i.candidate_id.last_name}`
+      : "Unknown",
+    role: i.job_id?.title || i.candidate_id?.current_position || "Interview",
+    scheduled_date: i.scheduled_date,
+    scheduled_time: i.scheduled_time || "09:00",
+  }));
+
+  const jobPostings = await Promise.all(
+    (
+      await JobPostingModel.find({ ...scope, is_published: true })
+        .populate("job_type_id", "name title")
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean()
+    ).map(async (j: any) => ({
+      title: j.title,
+      department: j.job_type_id?.name || j.job_type_id?.title || "General",
+      applicants: await CandidateModel.countDocuments({ ...scope, job_id: j._id }),
+      daysOpen: Math.max(
+        0,
+        Math.floor((Date.now() - new Date(j.createdAt).getTime()) / 86400000),
+      ),
+      priority: j.priority || "Low",
+    })),
+  );
 
   const hiringFunnel = {
     applications: applied + shortlisted + interviewScheduled + hired + rejected,
@@ -103,12 +153,12 @@ const companyDashboard = async (companyId: string) => {
       completedOnboardings,
     },
     candidatesByStatus,
-    interviewStatus: { pending: 0, completed: 0, cancelled: 0 },
+    interviewStatus: { pending: intPending, completed: intCompleted, cancelled: intCancelled },
     onboardingStatus: { pending: onbPending, inProgress: onbInProgress, completed: onbCompleted },
     hiringFunnel,
     calendarEvents,
-    recentActivities: { latestCandidates, upcomingInterviews: [] },
-    jobPostings: [],
+    recentActivities: { latestCandidates, upcomingInterviews },
+    jobPostings,
     alerts: { overdueInterviews: 0, pendingReviews: 0, incompleteOnboardings: 0, expiringJobs: 0 },
     welcomeCard: await getWelcomeCard(companyId),
   };

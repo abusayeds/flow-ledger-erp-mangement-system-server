@@ -41,7 +41,9 @@ const paymentReceivedSchema = new Schema<TPaymentReceived>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     customer_id: { type: Schema.Types.ObjectId, ref: 'User' },
+    customer_name: { type: String },
     vendor_id: { type: Schema.Types.ObjectId, ref: 'User' },
+    invoice_id: { type: Schema.Types.ObjectId, ref: 'Invoice' },
     invoice_number: { type: String },
     currency: { type: String },
     date: { type: Date },
@@ -68,7 +70,7 @@ const paymentReceivedSchema = new Schema<TPaymentReceived>(
     tax: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     isDeleted: { type: Boolean, default: false },
-    archive: { type: Boolean, default: false },
+    isArchive: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -10,8 +10,14 @@ const getSingleDB = (id: string, userId: string) => debitNoteService.getSingleDB
 
 const createDB = (payload: TDebitNote) => debitNoteService.createDB(payload);
 
+const updateDB = (id: string, userId: string, payload: Partial<TDebitNote>) =>
+  debitNoteService.updateDraftDB(id, userId, payload);
+
 const approveDB = (id: string, userId: string) => debitNoteService.approveDB(id, userId);
 
 const deleteDB = (id: string, userId: string) => debitNoteService.deleteDraftDB(id, userId);
 
-export const accountDebitNoteService = { getAllDB, getSingleDB, createDB, approveDB, deleteDB };
+const updateSignatureDB = (id: string, userId: string, signature: string) =>
+  debitNoteService.updateSignatureDB(id, userId, signature);
+
+export const accountDebitNoteService = { getAllDB, getSingleDB, createDB, updateDB, approveDB, deleteDB, updateSignatureDB };

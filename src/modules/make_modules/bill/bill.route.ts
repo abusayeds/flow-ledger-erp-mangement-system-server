@@ -23,4 +23,23 @@ router.get(
   billController.getAll
 );
 
+router.post(
+  '/edit/:id',
+  authMiddleware(role.company),
+  billController.update
+);
+
+router.delete(
+  '/delete/:id',
+  authMiddleware(role.company),
+  billController.remove
+);
+
+// `delete` is a soft delete, so a trashed bill can be brought back.
+router.post(
+  '/restore/:id',
+  authMiddleware(role.company),
+  billController.restore
+);
+
 export const billRoutes = router;

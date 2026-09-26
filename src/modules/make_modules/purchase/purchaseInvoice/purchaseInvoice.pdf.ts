@@ -53,7 +53,7 @@ export const generatePurchaseInvoicePDF = (invoice: any, settings: any, res: Res
   // ── Meta box (number / dates / status) ──
   const meta: [string, string][] = [
     ["Invoice #", invoice.invoice_number || ""],
-    ["Invoice Date", dateStr(invoice.invoice_date)],
+    ["Invoice Date", dateStr(invoice.date)],
     ["Due Date", dateStr(invoice.due_date)],
     ["Status", String(invoice.status || "").toUpperCase()],
   ];
@@ -81,13 +81,14 @@ export const generatePurchaseInvoicePDF = (invoice: any, settings: any, res: Res
   y = Math.max(leftY, y + meta.length * 16) + 12;
 
   // ── Items table ──
+  const lineItems = [...(invoice.product || []), ...(invoice.service || [])];
   const cols = [
-    { label: "Product", w: CONTENT_W - 0.5 * CONTENT_W, key: "name", align: "left" },
+    { label: "Item", w: CONTENT_W - 0.5 * CONTENT_W, key: "name", align: "left" },
     { label: "Qty", w: CONTENT_W * 0.1, key: "quantity" },
-    { label: "Unit Price", w: CONTENT_W * 0.14, key: "unit_price" },
-    { label: "Disc %", w: CONTENT_W * 0.1, key: "discount_percentage" },
-    { label: "Tax %", w: CONTENT_W * 0.1, key: "tax_percentage" },
-    { label: "Amount", w: CONTENT_W * 0.16, key: "total_amount" },
+    { label: "Rate", w: CONTENT_W * 0.14, key: "rate" },
+    { label: "Disc", w: CONTENT_W * 0.1, key: "discount" },
+    { label: "Tax", w: CONTENT_W * 0.1, key: "tax" },
+    { label: "Amount", w: CONTENT_W * 0.16, key: "amount" },
   ];
   let hx = margin;
   cols.forEach((c) => {
@@ -98,17 +99,18 @@ export const generatePurchaseInvoicePDF = (invoice: any, settings: any, res: Res
   });
   y += 16;
 
-  (invoice.items || []).forEach((it: any, i: number) => {
+  lineItems.forEach((it: any, i: number) => {
     const bg = i % 2 === 0 ? "#ffffff" : "#f9f9f9";
     let cx = margin;
     const product = it.product_id || {};
+    const service = it.service_id || {};
     const cells = [
-      { v: product.productName || product.sku || "-", align: "left" },
+      { v: product.productName || product.sku || service.name || "-", align: "left" },
       { v: it.quantity },
-      { v: money(it.unit_price) },
-      { v: money(it.discount_percentage) },
-      { v: money(it.tax_percentage) },
-      { v: money(it.total_amount) },
+      { v: money(it.rate) },
+      { v: money(it.discount) },
+      { v: money(it.tax) },
+      { v: money(it.amount) },
     ];
     cols.forEach((c, ci) => {
       rect(cx, y, c.w, 15, bg, border);
@@ -122,10 +124,11 @@ export const generatePurchaseInvoicePDF = (invoice: any, settings: any, res: Res
 
   // ── Summary ──
   const rows: [string, string, boolean?][] = [
-    ["Subtotal", money(invoice.subtotal)],
-    ["Discount", money(invoice.discount_amount)],
-    ["Tax", money(invoice.tax_amount)],
-    ["Total", money(invoice.total_amount), true],
+    ["Subtotal", money(invoice.sub_total)],
+    ["Discount", money(invoice.discount)],
+    ["Shipping", money(invoice.shipping_cost)],
+    ["Tax", money(invoice.tax)],
+    ["Total", money(invoice.total), true],
     ["Paid", money(invoice.paid_amount)],
     ["Debit Note Applied", money(invoice.debit_note_applied)],
     ["Balance Due", money(invoice.balance_amount), true],

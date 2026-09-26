@@ -91,8 +91,12 @@ export const generateProformaInvoicePDF = async (settings: any, res: any) => {
   const textColor     = style.text_color      || "#000000";
 
   // ── Font size ────────────────────────────────────────────────────────────
-  const fontSizeMap: any = { small: 7, normal: 8, large: 9 };
-  const baseFontSize     = fontSizeMap[style.font_size] || 8;
+  const fontSizeMap: any = { small: 7, normal: 8, medium: 8, large: 9, big: 9 };
+  const baseFontSize = (typeof style.font_size === "number"
+    ? style.font_size
+    : (String(style.font_size ?? "").trim() !== "" && !isNaN(Number(style.font_size))
+        ? Number(style.font_size)
+        : fontSizeMap[style.font_size])) || 8;
 
   // ── Page metrics ─────────────────────────────────────────────────────────
   const margin    = style.margin || { top: 30, right: 30, bottom: 30, left: 30 };
@@ -151,7 +155,7 @@ export const generateProformaInvoicePDF = async (settings: any, res: any) => {
     if (footer.created_moon_invoice_hyperlink !== false) {
       setFont(false, 7);
       doc.fillColor(rgb("#999999")).text(
-        "Created by mooninvoice",
+        "Created by Qayd",
         margin.left,
         PAGE_H - margin.bottom - 12,
         { width: CONTENT_W, align: "center" }
@@ -369,8 +373,7 @@ export const generateProformaInvoicePDF = async (settings: any, res: any) => {
   // ════════════════════════════════════════════════════════════════════════
   const drawProdHeader = () => { y = drawTableHeader(prodCols, tableX, y, 16); };
 
-  checkPageBreak(32);
-  drawProdHeader();
+  if (data.products.length > 0) { checkPageBreak(32); drawProdHeader(); }
 
   data.products.forEach((prod: any, i: number) => {
     const totalH = 14 + (prod.description ? 18 : 0);
@@ -398,8 +401,7 @@ export const generateProformaInvoicePDF = async (settings: any, res: any) => {
   // ════════════════════════════════════════════════════════════════════════
   const drawSvcHeader = () => { y = drawTableHeader(svcCols, tableX, y, 16); };
 
-  checkPageBreak(32);
-  drawSvcHeader();
+  if (data.services.length > 0) { checkPageBreak(32); drawSvcHeader(); }
 
   data.services.forEach((svc: any, i: number) => {
     const totalH = 14 + (svc.description ? 18 : 0);
@@ -531,7 +533,8 @@ export const generateProformaInvoicePDF = async (settings: any, res: any) => {
   if (signature.company_sign !== "hide" || header.qr_code !== false) {
     const qrW  = 70;
     const sigW = 130;
-    checkPageBreak(qrW + 20);
+    y += 28;
+    checkPageBreak(qrW + 40);
 
     const baseY = y;
     const sigX  = margin.left + CONTENT_W * 0.25;

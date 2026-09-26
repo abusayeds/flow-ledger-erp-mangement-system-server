@@ -1,8 +1,16 @@
 node_modules
 dist/
-/public
+/public/*          
+!/public/files     
+/public/files/*    
+!/public/files/qayd.png   
 /logs
+
+# Env files (never commit secrets — keep .env.example only)
 .env
+.env.*
+!.env.example
+
 .tmp_*
 .cursor/
 docs/
@@ -13,3 +21,8 @@ postman/
 CLAUDE.md
 claude-rules/
 main-files/
+*.zip
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore

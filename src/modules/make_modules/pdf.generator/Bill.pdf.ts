@@ -1,3 +1,5 @@
+import { drawQaydBranding } from "./qaydBranding";
+
 const PDFDocument = require("pdfkit");
 
 // ─── Color Helper ────────────────────────────────────────────────────────────
@@ -9,11 +11,11 @@ const hexToRgb = (hex: any): [number, number, number] => {
 // ─── Dummy Data ───────────────────────────────────────────────────────────────
 const getDummyBillData = () => ({
   invoiceNumber: "MTPL001619",
-  poNumber:      "852",
-  date:          "Feb 9, 2021",
-  dueDate:       "Feb 9, 2021",
-  total:         "648.53 USD",
-  outstanding:   "98.52 USD",
+  poNumber: "852",
+  date: "Feb 9, 2021",
+  dueDate: "Feb 9, 2021",
+  total: "648.53 USD",
+  outstanding: "98.52 USD",
 
   company: {
     name: "info", regNo: "12344", taxId: "123457",
@@ -24,8 +26,8 @@ const getDummyBillData = () => ({
 
   billTo: {
     name: "Organization", email: "email@moontechiabs.com",
-    phone: "7412589633",  businessPhone: "8523659", poBox: "2501",
-    taxId: "KT-2030",     regNo: "REIS 001",        contactTaxId: "UT147852",
+    phone: "7412589633", businessPhone: "8523659", poBox: "2501",
+    taxId: "KT-2030", regNo: "REIS 001", contactTaxId: "UT147852",
     address: "A101\nThupai Complex\nAhmedabad Gujarat 259741\nIndia",
   },
 
@@ -35,15 +37,15 @@ const getDummyBillData = () => ({
   },
 
   products: [
-    { srNo:  1, name: "Moon Invoice Product 1",  description: "Create FREE unlimited invoices for freelancers, small business owners, and contractors for 7 days.", hsn: "HSN0001", quantity: 1, unitPrice: 160,  discount:  6, gst:  7.5, amount: 146.00  },
-    { srNo:  2, name: "Moon Invoice Product 2",  description: "Create FREE unlimited invoices for freelancers, small business owners, and contractors for 7 days.", hsn: "HSN0001", quantity: 1, unitPrice: 200,  discount: 10, gst: 10.0, amount: 190.00  },
+    { srNo: 1, name: "Moon Invoice Product 1", description: "Create FREE unlimited invoices for freelancers, small business owners, and contractors for 7 days.", hsn: "HSN0001", quantity: 1, unitPrice: 160, discount: 6, gst: 7.5, amount: 146.00 },
+    { srNo: 2, name: "Moon Invoice Product 2", description: "Create FREE unlimited invoices for freelancers, small business owners, and contractors for 7 days.", hsn: "HSN0001", quantity: 1, unitPrice: 200, discount: 10, gst: 10.0, amount: 190.00 },
 
   ],
 
   services: [
-    { srNo: 1, name: "TR01 - Moon Invoice Task",        description: "Create added attachment feature on Invoice, Estimate, Purchase Order, and Credit Note.", sac: "SAC0001", quantity: 1, rate:  120, discount:  "6%", gst: 6, amount:  114.00  },
-    { srNo: 2, name: "TR02 - UI Redesign",              description: "Complete redesign of dashboard and reporting module with new design system.",            sac: "SAC0002", quantity: 2, rate:  200, discount: "10%", gst: 8, amount:  374.40  },
-    
+    { srNo: 1, name: "TR01 - Moon Invoice Task", description: "Create added attachment feature on Invoice, Estimate, Purchase Order, and Credit Note.", sac: "SAC0001", quantity: 1, rate: 120, discount: "6%", gst: 6, amount: 114.00 },
+    { srNo: 2, name: "TR02 - UI Redesign", description: "Complete redesign of dashboard and reporting module with new design system.", sac: "SAC0002", quantity: 2, rate: 200, discount: "10%", gst: 8, amount: 374.40 },
+
   ],
 
   summary: {
@@ -57,12 +59,12 @@ const getDummyBillData = () => ({
 
   hsnSacSummary: [
     { hsnSac: "1116542", taxableValue: "100.00 USD", centralRate: "0.00", centralAmount: "0.00 USD", stateRate: "9%", stateAmount: "9.00 USD", totalTax: "9.00 USD" },
-    { hsnSac: "Total",   taxableValue: "100.00 USD", centralRate: "",     centralAmount: "0.00 USD", stateRate: "",   stateAmount: "9.00 USD", totalTax: "9.00 USD" },
+    { hsnSac: "Total", taxableValue: "100.00 USD", centralRate: "", centralAmount: "0.00 USD", stateRate: "", stateAmount: "9.00 USD", totalTax: "9.00 USD" },
   ],
 
-  signature:  { companyName: "info", subtitle: "Authorized Signatory" },
+  signature: { companyName: "info", subtitle: "Authorized Signatory" },
   qrCodeData: "https://mooninvoice.com/invoice/MTPL001619",
-   paymentDetails: [
+  paymentDetails: [
     { paymentNo: "01", date: "Sep 7, 2023", amount: "100.00 USD", paymentType: "Stripe" },
   ],
 });
@@ -72,32 +74,36 @@ const getDummyBillData = () => ({
 // ════════════════════════════════════════════════════════════════════════════
 export const generateBillPDF = async (settings: any, res: any) => {
   const data = getDummyBillData();
-  const s    = settings || {};
+  const s = settings || {};
 
-  const style     = s.style       || {};
-  const columns   = s.columns     || {};
-  const header    = s.header      || {};
-  const company   = s.company     || {};
-  const contact   = s.contact     || {};
-  const summary   = s.summary     || {};
+  const style = s.style || {};
+  const columns = s.columns || {};
+  const header = s.header || {};
+  const company = s.company || {};
+  const contact = s.contact || {};
+  const summary = s.summary || {};
   const noteTerms = s.notes_terms || {};
-  const signature = s.signature   || {};
-  const footer    = s.footer      || {};
+  const signature = s.signature || {};
+  const footer = s.footer || {};
 
   // ── Colors ──────────────────────────────────────────────────────────────
-  const fillColor     = style.fill_color      || "#3a4a6b";
-  const fillTextColor = style.fill_text_color  || "#ffffff";
-  const borderColor   = style.border_color    || "#cccccc";
-  const textColor     = style.text_color      || "#000000";
+  const fillColor = style.fill_color || "#3a4a6b";
+  const fillTextColor = style.fill_text_color || "#ffffff";
+  const borderColor = style.border_color || "#cccccc";
+  const textColor = style.text_color || "#000000";
 
   // ── Font size ────────────────────────────────────────────────────────────
-  const fontSizeMap: any = { small: 7, normal: 8, large: 9 };
-  const baseFontSize     = fontSizeMap[style.font_size] || 8;
+  const fontSizeMap: any = { small: 7, normal: 8, medium: 8, large: 9, big: 9 };
+  const baseFontSize = (typeof style.font_size === "number"
+    ? style.font_size
+    : (String(style.font_size ?? "").trim() !== "" && !isNaN(Number(style.font_size))
+        ? Number(style.font_size)
+        : fontSizeMap[style.font_size])) || 8;
 
   // ── Page metrics ─────────────────────────────────────────────────────────
-  const margin    = style.margin || { top: 30, right: 30, bottom: 30, left: 30 };
-  const PAGE_W    = 595;
-  const PAGE_H    = 842;
+  const margin = style.margin || { top: 30, right: 30, bottom: 30, left: 30 };
+  const PAGE_W = 595;
+  const PAGE_H = 842;
   const CONTENT_W = PAGE_W - margin.left - margin.right;
 
   // Leave room for footer + outer-border stroke at the bottom
@@ -109,7 +115,7 @@ export const generateBillPDF = async (settings: any, res: any) => {
   res.setHeader("Content-Disposition", 'inline; filename="purchase-order.pdf"');
   doc.pipe(res);
 
-  let y         = margin.top;
+  let y = margin.top;
   let pageCount = 1;
 
   // ════════════════════════════════════════════════════════════════════════
@@ -125,11 +131,11 @@ export const generateBillPDF = async (settings: any, res: any) => {
     fillHex: string | null, strokeHex: string | null
   ) => {
     doc.save();
-    if (fillHex)   doc.fillColor(rgb(fillHex));
+    if (fillHex) doc.fillColor(rgb(fillHex));
     if (strokeHex) doc.strokeColor(rgb(strokeHex));
     if (fillHex && strokeHex) doc.rect(x, yy, w, h).fillAndStroke();
-    else if (fillHex)         doc.rect(x, yy, w, h).fill();
-    else if (strokeHex)       doc.rect(x, yy, w, h).stroke();
+    else if (fillHex) doc.rect(x, yy, w, h).fill();
+    else if (strokeHex) doc.rect(x, yy, w, h).stroke();
     doc.restore();
   };
 
@@ -137,8 +143,8 @@ export const generateBillPDF = async (settings: any, res: any) => {
     setFont(opts.bold || false, opts.size || baseFontSize);
     doc.fillColor(rgb(opts.color || textColor));
     doc.text(String(str ?? ""), x, yy, {
-      width:     opts.width    ?? CONTENT_W,
-      align:     opts.align    ?? "left",
+      width: opts.width ?? CONTENT_W,
+      align: opts.align ?? "left",
       lineBreak: opts.lineBreak !== undefined ? opts.lineBreak : false,
     });
   };
@@ -149,12 +155,12 @@ export const generateBillPDF = async (settings: any, res: any) => {
   const decorateCurrentPage = () => {
     // ── Footer ──
     if (footer.created_moon_invoice_hyperlink !== false) {
-      setFont(false, 7);
-      doc.fillColor(rgb("#999999")).text(
-        "Created by mooninvoice",
+      drawQaydBranding(
+        doc,
         margin.left,
         PAGE_H - margin.bottom - 12,
-        { width: CONTENT_W, align: "center" }
+        CONTENT_W,
+        { align: "center" }
       );
     }
 
@@ -164,9 +170,9 @@ export const generateBillPDF = async (settings: any, res: any) => {
         .strokeColor(rgb(borderColor))
         .lineWidth(0.75)
         .rect(
-          margin.left  - 5,
-          margin.top   - 5,
-          CONTENT_W    + 10,
+          margin.left - 5,
+          margin.top - 5,
+          CONTENT_W + 10,
           PAGE_H - margin.top - margin.bottom + 10
         )
         .stroke()
@@ -246,37 +252,37 @@ export const generateBillPDF = async (settings: any, res: any) => {
   // ════════════════════════════════════════════════════════════════════════
   const buildProdCols = (): any[] => {
     const c: any[] = [];
-    if (columns.serial     !== false)  c.push({ label: "Sr. No.",   w: 38, key: "srNo" });
-    c.push({ label: "Products",         w: 0,  key: "name",    align: "left" });
-    if (columns.hsn        !== false)  c.push({ label: "H S N",     w: 52, key: "hsn" });
-    if (columns.quntity    !== "hide") c.push({ label: "Quantity",   w: 48, key: "quantity" });
-    c.push({ label: "Unit\nPrice",       w: 48, key: "unitPrice" });
-    if (columns.discount   !== false)  c.push({ label: "Discount",   w: 48, key: "discount" });
-    if (columns.tax        !== "hide") c.push({ label: "G S T",      w: 38, key: "gst" });
-    if (columns.line_total !== false)  c.push({ label: "Amount",     w: 50, key: "amount" });
+    if (columns.serial !== false) c.push({ label: "Sr. No.", w: 38, key: "srNo" });
+    c.push({ label: "Products", w: 0, key: "name", align: "left" });
+    if (columns.hsn !== false) c.push({ label: "H S N", w: 52, key: "hsn" });
+    if (columns.quntity !== "hide") c.push({ label: "Quantity", w: 48, key: "quantity" });
+    c.push({ label: "Unit\nPrice", w: 48, key: "unitPrice" });
+    if (columns.discount !== false) c.push({ label: "Discount", w: 48, key: "discount" });
+    if (columns.tax !== "hide") c.push({ label: "G S T", w: 38, key: "gst" });
+    if (columns.line_total !== false) c.push({ label: "Amount", w: 50, key: "amount" });
     const fix = c.filter(x => x.key !== "name").reduce((s, x) => s + x.w, 0);
-    const nc  = c.find(x => x.key === "name"); if (nc) nc.w = CONTENT_W - fix;
+    const nc = c.find(x => x.key === "name"); if (nc) nc.w = CONTENT_W - fix;
     return c;
   };
 
   const buildSvcCols = (): any[] => {
     const c: any[] = [];
-    if (columns.serial     !== false)  c.push({ label: "Sr. No.",   w: 38, key: "srNo" });
-    c.push({ label: "Services",         w: 0,  key: "name",    align: "left" });
-    if (columns.sac        !== false)  c.push({ label: "S A C",     w: 52, key: "sac" });
-    if (columns.quntity    !== "hide") c.push({ label: "Quantity",   w: 48, key: "quantity" });
-    c.push({ label: "Rate",              w: 48, key: "rate" });
-    if (columns.discount   !== false)  c.push({ label: "Discount",   w: 48, key: "discount" });
-    if (columns.tax        !== "hide") c.push({ label: "G S T",      w: 38, key: "gst" });
-    if (columns.line_total !== false)  c.push({ label: "Amount",     w: 50, key: "amount" });
+    if (columns.serial !== false) c.push({ label: "Sr. No.", w: 38, key: "srNo" });
+    c.push({ label: "Services", w: 0, key: "name", align: "left" });
+    if (columns.sac !== false) c.push({ label: "S A C", w: 52, key: "sac" });
+    if (columns.quntity !== "hide") c.push({ label: "Quantity", w: 48, key: "quantity" });
+    c.push({ label: "Rate", w: 48, key: "rate" });
+    if (columns.discount !== false) c.push({ label: "Discount", w: 48, key: "discount" });
+    if (columns.tax !== "hide") c.push({ label: "G S T", w: 38, key: "gst" });
+    if (columns.line_total !== false) c.push({ label: "Amount", w: 50, key: "amount" });
     const fix = c.filter(x => x.key !== "name").reduce((s, x) => s + x.w, 0);
-    const nc  = c.find(x => x.key === "name"); if (nc) nc.w = CONTENT_W - fix;
+    const nc = c.find(x => x.key === "name"); if (nc) nc.w = CONTENT_W - fix;
     return c;
   };
 
-  const tableX   = margin.left;
+  const tableX = margin.left;
   const prodCols = buildProdCols();
-  const svcCols  = buildSvcCols();
+  const svcCols = buildSvcCols();
 
   // ════════════════════════════════════════════════════════════════════════
   // SECTION 1 — HEADER
@@ -288,39 +294,39 @@ export const generateBillPDF = async (settings: any, res: any) => {
     });
     y += 22;
 
-    const infoX  = margin.left;
-    const infoW  = CONTENT_W * 0.42;
+    const infoX = margin.left;
+    const infoW = CONTENT_W * 0.42;
     const startY = y;
-    let leftY    = y;
+    let leftY = y;
 
-    if (company.name    !== false) { setFont(true, baseFontSize + 2); doc.fillColor(rgb(textColor)).text(data.company.name, infoX, leftY, { width: infoW }); leftY += 14; }
-    if (company.Reg_no  !== false) { drawText(`Reg. No: ${data.company.regNo}`,  infoX, leftY); leftY += 11; }
-    if (company.tax_id  !== false) { drawText(`Tax ID: ${data.company.taxId}`,   infoX, leftY); leftY += 11; }
+    if (company.name !== false) { setFont(true, baseFontSize + 2); doc.fillColor(rgb(textColor)).text(data.company.name, infoX, leftY, { width: infoW }); leftY += 14; }
+    if (company.Reg_no !== false) { drawText(`Reg. No: ${data.company.regNo}`, infoX, leftY); leftY += 11; }
+    if (company.tax_id !== false) { drawText(`Tax ID: ${data.company.taxId}`, infoX, leftY); leftY += 11; }
     if (company.address !== false) { data.company.address.split("\n").forEach((l: string) => { drawText(l, infoX, leftY); leftY += 11; }); }
-    if (company.phone   !== false) { drawText(`Phone: ${data.company.phone}`,    infoX, leftY); leftY += 11; }
-    if (company.mobile  !== false) { drawText(`Mobile: ${data.company.mobile}`,  infoX, leftY); leftY += 11; }
-    if (company.fax     !== false) { drawText(`Fax: ${data.company.fax}`,        infoX, leftY); leftY += 11; }
-    if (company.email   !== false) { drawText(data.company.email,   infoX, leftY, { color: "#0066cc" }); leftY += 11; }
+    if (company.phone !== false) { drawText(`Phone: ${data.company.phone}`, infoX, leftY); leftY += 11; }
+    if (company.mobile !== false) { drawText(`Mobile: ${data.company.mobile}`, infoX, leftY); leftY += 11; }
+    if (company.fax !== false) { drawText(`Fax: ${data.company.fax}`, infoX, leftY); leftY += 11; }
+    if (company.email !== false) { drawText(data.company.email, infoX, leftY, { color: "#0066cc" }); leftY += 11; }
     if (company.website !== false) { drawText(data.company.website, infoX, leftY, { color: "#0066cc" }); leftY += 11; }
 
     const detailX = margin.left + CONTENT_W * 0.5;
-    const boxX    = detailX - 5;
-    const boxW    = PAGE_W - boxX - margin.right;
-    const rowH    = 14;
-    let rightY    = startY;
+    const boxX = detailX - 5;
+    const boxW = PAGE_W - boxX - margin.right;
+    const rowH = 14;
+    let rightY = startY;
 
-   const detailRows = [];
-    if (header.number !== false)    detailRows.push(["Bill #", data.invoiceNumber]);
-    if (header.po_no !== false)     detailRows.push(["P.O. #", data.poNumber]);
+    const detailRows = [];
+    if (header.number !== false) detailRows.push(["Bill #", data.invoiceNumber]);
+    if (header.po_no !== false) detailRows.push(["P.O. #", data.poNumber]);
     detailRows.push(["Date", data.date]);
-    if (header.due_date !== false)  detailRows.push(["Due Date", data.dueDate]);
+    if (header.due_date !== false) detailRows.push(["Due Date", data.dueDate]);
     if (header.total_amount !== false) detailRows.push(["Total", data.total]);
     if (header.total_outstanding !== false) detailRows.push(["Outstanding", data.outstanding]);
 
     detailRows.forEach((row, i) => {
       const ry = rightY + i * rowH;
       drawRect(boxX, ry, boxW, rowH, i % 2 === 0 ? "#f0f4ff" : "#ffffff", borderColor);
-      drawText(row[0], boxX + 4,           ry + 3, { bold: true, width: boxW * 0.45 });
+      drawText(row[0], boxX + 4, ry + 3, { bold: true, width: boxW * 0.45 });
       drawText(row[1], boxX + boxW * 0.47, ry + 3, { width: boxW * 0.5, align: "right" });
     });
 
@@ -335,17 +341,17 @@ export const generateBillPDF = async (settings: any, res: any) => {
     const halfW = CONTENT_W / 2 - 5;
     const billX = margin.left;
     const shipX = margin.left + halfW + 10;
-    let billY   = y;
-    let shipY   = y;
+    let billY = y;
+    let shipY = y;
 
     drawText("Bill To:", billX, billY, { bold: true }); billY += 12;
-    if (contact.first_last_name !== false) { drawText(data.billTo.name,  billX, billY, { bold: true }); billY += 11; }
-    if (contact.email           !== false) { drawText(data.billTo.email, billX, billY, { color: "#0066cc" }); billY += 11; }
-    if (contact.home_phone      !== false) { drawText(`Home: ${data.billTo.phone}`,             billX, billY); billY += 11; }
-    if (contact.business_phone  !== false) { drawText(`Business: ${data.billTo.businessPhone}`, billX, billY); billY += 11; }
+    if (contact.first_last_name !== false) { drawText(data.billTo.name, billX, billY, { bold: true }); billY += 11; }
+    if (contact.email !== false) { drawText(data.billTo.email, billX, billY, { color: "#0066cc" }); billY += 11; }
+    if (contact.home_phone !== false) { drawText(`Home: ${data.billTo.phone}`, billX, billY); billY += 11; }
+    if (contact.business_phone !== false) { drawText(`Business: ${data.billTo.businessPhone}`, billX, billY); billY += 11; }
     drawText(`P.O. Box: ${data.billTo.poBox}`, billX, billY); billY += 11;
-    drawText(`Fax: ${data.billTo.taxId}`,      billX, billY); billY += 11;
-    if (contact.reg_no !== false) { drawText(`Reg. No: ${data.billTo.regNo}`,       billX, billY); billY += 11; }
+    drawText(`Fax: ${data.billTo.taxId}`, billX, billY); billY += 11;
+    if (contact.reg_no !== false) { drawText(`Reg. No: ${data.billTo.regNo}`, billX, billY); billY += 11; }
     if (contact.tax_id !== false) { drawText(`Tax ID: ${data.billTo.contactTaxId}`, billX, billY); billY += 11; }
 
     drawText("Ship To:", shipX, shipY, { bold: true }); shipY += 12;
@@ -373,8 +379,7 @@ export const generateBillPDF = async (settings: any, res: any) => {
   // ════════════════════════════════════════════════════════════════════════
   const drawProdHeader = () => { y = drawTableHeader(prodCols, tableX, y, 16); };
 
-  checkPageBreak(32);
-  drawProdHeader();
+  if (data.products.length > 0) { checkPageBreak(32); drawProdHeader(); }
 
   data.products.forEach((prod: any, i: number) => {
     const totalH = 14 + (prod.description ? 18 : 0);
@@ -402,8 +407,7 @@ export const generateBillPDF = async (settings: any, res: any) => {
   // ════════════════════════════════════════════════════════════════════════
   const drawSvcHeader = () => { y = drawTableHeader(svcCols, tableX, y, 16); };
 
-  checkPageBreak(32);
-  drawSvcHeader();
+  if (data.services.length > 0) { checkPageBreak(32); drawSvcHeader(); }
 
   data.services.forEach((svc: any, i: number) => {
     const totalH = 14 + (svc.description ? 18 : 0);
@@ -430,24 +434,24 @@ export const generateBillPDF = async (settings: any, res: any) => {
   // SECTION 6 — TERMS & SUMMARY
   // ════════════════════════════════════════════════════════════════════════
   const sumRows: any[] = [];
-  if (summary.sub_total       !== false) sumRows.push(["Sub Total",       `${data.summary.subTotal.toFixed(2)} USD`]);
-  if (summary.discount        !== false) sumRows.push(["Discount (10%)",  `${data.summary.discount.toFixed(2)} USD`]);
+  if (summary.sub_total !== false) sumRows.push(["Sub Total", `${data.summary.subTotal.toFixed(2)} USD`]);
+  if (summary.discount !== false) sumRows.push(["Discount (10%)", `${data.summary.discount.toFixed(2)} USD`]);
   if (summary.inline_discount !== false) sumRows.push(["Inline Discount", `${data.summary.inlineDiscount.toFixed(2)} USD`]);
-  if (summary.shipping_cost   !== false) sumRows.push(["Shipping Cost",   `${data.summary.shippingCost.toFixed(2)} USD`]);
+  if (summary.shipping_cost !== false) sumRows.push(["Shipping Cost", `${data.summary.shippingCost.toFixed(2)} USD`]);
   sumRows.push(["GST 9% on 5%", `${data.summary.gst9on5.toFixed(2)} USD`]);
-  if (summary.total           !== false) sumRows.push(["Total",           `${data.summary.total.toFixed(2)} USD`,     true]);
-  if (summary.amount_paid     !== false) sumRows.push(["Amount Paid",     `${data.summary.amountPaid.toFixed(2)} USD`]);
-  if (summary.return_order    !== false) sumRows.push(["Return Order",    `${data.summary.returnOrder.toFixed(2)} USD`]);
-  if (summary.amount_due      !== false) sumRows.push(["Amount Due",      `${data.summary.amountDue.toFixed(2)} USD`,  true]);
+  if (summary.total !== false) sumRows.push(["Total", `${data.summary.total.toFixed(2)} USD`, true]);
+  if (summary.amount_paid !== false) sumRows.push(["Amount Paid", `${data.summary.amountPaid.toFixed(2)} USD`]);
+  if (summary.return_order !== false) sumRows.push(["Return Order", `${data.summary.returnOrder.toFixed(2)} USD`]);
+  if (summary.amount_due !== false) sumRows.push(["Amount Due", `${data.summary.amountDue.toFixed(2)} USD`, true]);
 
   checkPageBreak(Math.max(80, sumRows.length * 13 + 20));
 
   const termsX = margin.left;
   const termsW = CONTENT_W * 0.55;
-  const sumX   = margin.left + CONTENT_W * 0.57;
-  const sumW   = CONTENT_W * 0.43;
-  let termsY   = y;
-  let sumY     = y;
+  const sumX = margin.left + CONTENT_W * 0.57;
+  const sumW = CONTENT_W * 0.43;
+  let termsY = y;
+  let sumY = y;
 
   if (noteTerms.terms_and_condition !== false) {
     drawText("Terms & Conditions", termsX, termsY, { bold: true }); termsY += 11;
@@ -463,11 +467,11 @@ export const generateBillPDF = async (settings: any, res: any) => {
   }
 
   sumRows.forEach((row, i) => {
-    const rowH   = 13;
+    const rowH = 13;
     const isBold = !!row[2];
-    const bg     = isBold ? "#e8edf5" : (i % 2 === 0 ? "#f9f9f9" : "#ffffff");
+    const bg = isBold ? "#e8edf5" : (i % 2 === 0 ? "#f9f9f9" : "#ffffff");
     drawRect(sumX, sumY, sumW, rowH, bg, borderColor);
-    drawText(row[0], sumX + 4,           sumY + 2, { bold: isBold, size: baseFontSize - 0.5, width: sumW * 0.55 });
+    drawText(row[0], sumX + 4, sumY + 2, { bold: isBold, size: baseFontSize - 0.5, width: sumW * 0.55 });
     drawText(row[1], sumX + sumW * 0.55, sumY + 2, { bold: isBold, size: baseFontSize - 0.5, width: sumW * 0.42, align: "right" });
     sumY += rowH;
   });
@@ -481,10 +485,10 @@ export const generateBillPDF = async (settings: any, res: any) => {
     checkPageBreak(26 + data.hsnSacSummary.length * 14 + 10);
 
     const hsnCols: any[] = [
-      { label: "HSN/SAC",          w: 70 },
-      { label: "Taxable Value",    w: 80 },
-      { label: "Central Tax",      w: 110, sub: true, cols: [{ label: "Rate", w: 55 }, { label: "Amount", w: 55 }] },
-      { label: "State Tax",        w: 110, sub: true, cols: [{ label: "Rate", w: 55 }, { label: "Amount", w: 55 }] },
+      { label: "HSN/SAC", w: 70 },
+      { label: "Taxable Value", w: 80 },
+      { label: "Central Tax", w: 110, sub: true, cols: [{ label: "Rate", w: 55 }, { label: "Amount", w: 55 }] },
+      { label: "State Tax", w: 110, sub: true, cols: [{ label: "Rate", w: 55 }, { label: "Amount", w: 55 }] },
       { label: "Total Tax Amount", w: CONTENT_W - 370 },
     ];
 
@@ -515,10 +519,10 @@ export const generateBillPDF = async (settings: any, res: any) => {
 
     data.hsnSacSummary.forEach((row: any, i: number) => {
       checkPageBreak(14);
-      const rh     = 14;
+      const rh = 14;
       const isLast = i === data.hsnSacSummary.length - 1;
-      const bg     = isLast ? "#e8edf5" : (i % 2 === 0 ? "#ffffff" : "#f5f5f5");
-      const vals   = [row.hsnSac, row.taxableValue, row.centralRate, row.centralAmount, row.stateRate, row.stateAmount, row.totalTax];
+      const bg = isLast ? "#e8edf5" : (i % 2 === 0 ? "#ffffff" : "#f5f5f5");
+      const vals = [row.hsnSac, row.taxableValue, row.centralRate, row.centralAmount, row.stateRate, row.stateAmount, row.totalTax];
       const widths = [70, 80, 55, 55, 55, 55, CONTENT_W - 370];
       let rx = tableX;
       vals.forEach((v: string, vi: number) => {
@@ -536,25 +540,26 @@ export const generateBillPDF = async (settings: any, res: any) => {
   // SECTION 8 — SIGNATURE + QR
   // ════════════════════════════════════════════════════════════════════════
   if (signature.company_sign !== "hide" || header.qr_code !== false) {
-    const qrW  = 70;
+    const qrW = 70;
     const sigW = 130;
-    checkPageBreak(qrW + 20);
+    y += 28;
+    checkPageBreak(qrW + 40);
 
     const baseY = y;
-    const sigX  = margin.left + CONTENT_W * 0.25;
-    const qrX   = PAGE_W - margin.right - CONTENT_W * 0.15 - qrW;
+    const sigX = margin.left + CONTENT_W * 0.25;
+    const qrX = PAGE_W - margin.right - CONTENT_W * 0.15 - qrW;
 
     if (signature.company_sign !== "hide") {
       doc.save().strokeColor(rgb(borderColor))
         .moveTo(sigX, baseY + 20).lineTo(sigX + sigW, baseY + 20)
         .stroke().restore();
       drawText(data.signature.companyName, sigX, baseY + 22, { bold: true, width: sigW, align: "center" });
-      drawText(data.signature.subtitle,    sigX, baseY + 35, { width: sigW, align: "center", color: "#666666" });
+      drawText(data.signature.subtitle, sigX, baseY + 35, { width: sigW, align: "center", color: "#666666" });
     }
 
     if (header.qr_code !== false) {
       try {
-        const QRCode    = require("qrcode");
+        const QRCode = require("qrcode");
         const qrBuffer: Buffer = await QRCode.toBuffer(data.qrCodeData, {
           type: "png", width: qrW, margin: 1,
           color: { dark: "#000000", light: "#ffffff" },
@@ -572,7 +577,7 @@ export const generateBillPDF = async (settings: any, res: any) => {
     y += qrW + 15;
   }
 
-   // ─── PAYMENT DETAILS ─────────────────────────────────────────────────────
+  // ─── PAYMENT DETAILS ─────────────────────────────────────────────────────
   {
     y += 5;
     // Title
@@ -583,8 +588,8 @@ export const generateBillPDF = async (settings: any, res: any) => {
 
     const payCols = [
       { label: "Payment #", w: CONTENT_W * 0.18 },
-      { label: "Date",      w: CONTENT_W * 0.25 },
-      { label: "Amount",    w: CONTENT_W * 0.32 },
+      { label: "Date", w: CONTENT_W * 0.25 },
+      { label: "Amount", w: CONTENT_W * 0.32 },
       { label: "Payment Type", w: CONTENT_W * 0.25 },
     ];
 
@@ -597,7 +602,7 @@ export const generateBillPDF = async (settings: any, res: any) => {
     });
     y += 14;
 
-    data.paymentDetails.forEach((pay , i) => {
+    data.paymentDetails.forEach((pay, i) => {
       const rh = 14;
       const bg = i % 2 === 0 ? "#ffffff" : "#f9f9f9";
       const vals3 = [pay.paymentNo, pay.date, pay.amount, pay.paymentType];

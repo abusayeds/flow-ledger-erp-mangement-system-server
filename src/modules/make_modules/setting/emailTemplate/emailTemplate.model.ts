@@ -37,6 +37,7 @@ const emailTemplateSchema = new Schema<TEmailTemplate>(
       purchase_order: { type: itemSchema, default: {} },
       bill: { type: itemSchema, default: {} },
       debit_note: { type: itemSchema, default: {} },
+      expense: { type: itemSchema, default: {} },
       payment_made: { type: itemSchema, default: {} },
       statement: { type: itemSchema, default: {} },
       payment_reminder: { type: itemSchema, default: {} },

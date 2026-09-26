@@ -4,6 +4,7 @@ import AppError from "../../../../errors/AppError";
 import queryBuilder from "../../../../builder/queryBuilder";
 import { AuthRequest } from "../../../../middlewares/auth";
 import { TPermissionKey } from "../../../../utils/permission";
+import { parseDeleteIdsFromParam, runBulkDelete } from "../../../../utils/bulkDelete";;
 import {
   applyOwnershipToQuery,
   companyScope,
@@ -99,8 +100,7 @@ export const createHrmCrudService = <T = any>(config: HrmCrudConfig<T>) => {
     let payload = { ...body };
     delete payload.user_id;
     delete payload.creator_id;
-    delete payload.isDeleted;
-    if (config.beforeUpdate) payload = await config.beforeUpdate(payload, req);
+        if (config.beforeUpdate) payload = await config.beforeUpdate(payload, req);
     const updated = await model.findOneAndUpdate(
       { _id: id, ...companyScope(companyId) },
       { $set: payload } as never,
@@ -111,10 +111,15 @@ export const createHrmCrudService = <T = any>(config: HrmCrudConfig<T>) => {
     return config.formatItem ? config.formatItem(obj) : leanDoc(obj as Record<string, unknown>);
   };
 
+  const removeOne = async (companyId: string, oneId: string, req: AuthRequest) => {
+    await getById(companyId, oneId, req);
+    await model.findOneAndUpdate({ _id: oneId, ...companyScope(companyId) }, { isDeleted: true });
+    return { _id: oneId };
+  };
+
   const remove = async (companyId: string, id: string, req: AuthRequest) => {
-    await getById(companyId, id, req);
-    await model.findOneAndUpdate({ _id: id, ...companyScope(companyId) }, { isDeleted: true });
-    return { _id: id };
+    const ids = parseDeleteIdsFromParam(id);
+    return runBulkDelete(ids, (oneId) => removeOne(companyId, oneId, req));
   };
 
   return {

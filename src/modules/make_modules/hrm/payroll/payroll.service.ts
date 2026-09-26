@@ -23,6 +23,7 @@ import {
 import { AuthRequest } from "../../../../middlewares/auth";
 import { getHrmCompanySettings } from "../shared/hrm.settings.service";
 import { assertEnumValue, PAYROLL_STATUS } from "../shared/hrm.statusValidation";
+import { withBulkDeleteAuthId } from "../../../../utils/bulkDelete";
 
 const calcComponent = (items: { type: string; amount: number }[], base: number) => {
   let total = 0;
@@ -47,6 +48,39 @@ const countWorkingDays = (start: Date, end: Date, workingDays: number[]) => {
   }
   return count;
 };
+
+const removeOne = async (req: AuthRequest, oneId: string) => {
+  const companyId = resolveCompanyId(req);
+  const payroll = await HrmPayrollModel.findOne({ _id: oneId, ...companyScope(companyId) });
+  if (!payroll) throw new AppError(httpStatus.NOT_FOUND, "Payroll not found");
+  await HrmPayrollEntryModel.updateMany({ payroll_id: oneId, ...companyScope(companyId) }, { isDeleted: true });
+  payroll.isDeleted = true;
+  await payroll.save();
+  return { _id: oneId };
+};
+
+const remove = withBulkDeleteAuthId(removeOne);
+
+const deleteEntryOne = async (req: AuthRequest, entryId: string) => {
+  const companyId = resolveCompanyId(req);
+  const entry = await HrmPayrollEntryModel.findOne({ _id: entryId, ...companyScope(companyId) });
+  if (!entry) throw new AppError(httpStatus.NOT_FOUND, "Payslip not found");
+  const payrollId = entry.payroll_id;
+  entry.isDeleted = true;
+  await entry.save();
+  const entries = await HrmPayrollEntryModel.find({ payroll_id: payrollId, isDeleted: false });
+  const payroll = await HrmPayrollModel.findOne({ _id: payrollId, ...companyScope(companyId) });
+  if (payroll) {
+    payroll.total_gross_pay = roundMoney(entries.reduce((s, e) => s + e.gross_pay, 0));
+    payroll.total_deductions = roundMoney(entries.reduce((s, e) => s + e.total_deductions + e.total_loans, 0));
+    payroll.total_net_pay = roundMoney(entries.reduce((s, e) => s + e.net_pay, 0));
+    payroll.employee_count = entries.length;
+    await payroll.save();
+  }
+  return { _id: entryId };
+};
+
+const deleteEntry = withBulkDeleteAuthId(deleteEntryOne);
 
 export const payrollService = {
   async list(req: AuthRequest, query: Record<string, unknown>) {
@@ -271,34 +305,9 @@ export const payrollService = {
     return updated;
   },
 
-  async remove(req: AuthRequest, id: string) {
-    const companyId = resolveCompanyId(req);
-    const payroll = await HrmPayrollModel.findOne({ _id: id, ...companyScope(companyId) });
-    if (!payroll) throw new AppError(httpStatus.NOT_FOUND, "Payroll not found");
-    await HrmPayrollEntryModel.updateMany({ payroll_id: id, ...companyScope(companyId) }, { isDeleted: true });
-    payroll.isDeleted = true;
-    await payroll.save();
-    return { _id: id };
-  },
+  remove,
 
-  async deleteEntry(req: AuthRequest, entryId: string) {
-    const companyId = resolveCompanyId(req);
-    const entry = await HrmPayrollEntryModel.findOne({ _id: entryId, ...companyScope(companyId) });
-    if (!entry) throw new AppError(httpStatus.NOT_FOUND, "Payslip not found");
-    const payrollId = entry.payroll_id;
-    entry.isDeleted = true;
-    await entry.save();
-    const entries = await HrmPayrollEntryModel.find({ payroll_id: payrollId, isDeleted: false });
-    const payroll = await HrmPayrollModel.findOne({ _id: payrollId, ...companyScope(companyId) });
-    if (payroll) {
-      payroll.total_gross_pay = roundMoney(entries.reduce((s, e) => s + e.gross_pay, 0));
-      payroll.total_deductions = roundMoney(entries.reduce((s, e) => s + e.total_deductions + e.total_loans, 0));
-      payroll.total_net_pay = roundMoney(entries.reduce((s, e) => s + e.net_pay, 0));
-      payroll.employee_count = entries.length;
-      await payroll.save();
-    }
-    return { _id: entryId };
-  },
+  deleteEntry,
 
   async printPayslip(req: AuthRequest, entryId: string) {
     const companyId = resolveCompanyId(req);

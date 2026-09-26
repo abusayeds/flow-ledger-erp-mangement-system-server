@@ -14,6 +14,7 @@ import { BankAccountModel } from "../bankAccount/bankAccount.model";
 import { ChartOfAccountModel } from "../chartOfAccount/chartOfAccount.model";
 import { createBankTransaction } from "../accountBank.service";
 import { AuthRequest } from "../../../../middlewares/auth";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const assertRefs = async (userId: string, payload: Partial<TAccountExpense>) => {
   if (payload.category_id) {
@@ -63,7 +64,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TAccountExp
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await AccountExpenseModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Expense not found");
   if (record.status !== "draft") {
@@ -162,6 +163,8 @@ const postDB = async (id: string, userId: string) => {
 
   return record;
 };
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const accountExpenseService = {
   createDB,

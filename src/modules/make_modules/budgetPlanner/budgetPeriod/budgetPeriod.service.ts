@@ -7,6 +7,7 @@ import { AuthRequest } from "../../../../middlewares/auth";
 import { BudgetModel } from "../budgets/budget.model";
 import { TBudgetPeriod } from "../budget.types";
 import { BudgetPeriodModel } from "./budgetPeriod.model";
+import { withBulkDeleteId } from "../../../../utils/bulkDelete";
 
 const assertDates = (start: Date, end: Date) => {
   if (new Date(end) <= new Date(start)) {
@@ -20,7 +21,7 @@ const createDB = async (payload: TBudgetPeriod) => {
 };
 
 const updateDB = async (id: string, userId: string, payload: Partial<TBudgetPeriod>) => {
-  const record = await BudgetPeriodModel.findOne({ _id: id, ...companyScope(userId), isDeleted: false });
+  const record = await BudgetPeriodModel.findOne({ _id: id, ...companyScope(userId) });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Budget period not found");
   const start = payload.start_date ?? record.start_date;
   const end = payload.end_date ?? record.end_date;
@@ -30,7 +31,7 @@ const updateDB = async (id: string, userId: string, payload: Partial<TBudgetPeri
   return record;
 };
 
-const deleteDB = async (id: string, userId: string) => {
+const deleteDBOne = async (id: string, userId: string) => {
   const record = await BudgetPeriodModel.findOneAndUpdate(
     { _id: id, ...companyScope(userId) },
     { isDeleted: true },
@@ -100,6 +101,8 @@ const listActiveDB = async (userId: string) =>
     .select("_id period_name financial_year start_date end_date status")
     .sort({ start_date: -1 })
     .lean();
+
+const deleteDB = withBulkDeleteId(deleteDBOne);
 
 export const budgetPeriodService = {
   createDB,

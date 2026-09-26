@@ -7,6 +7,7 @@ export type TDeliveryChallan = {
   _id?: Types.ObjectId;
   user_id: Types.ObjectId;
   customer_id?: Types.ObjectId;
+  customer_name?: string;
   vendor_id?: Types.ObjectId;
   invoice_number?: string;
   currency?: string;
@@ -35,7 +36,9 @@ export type TDeliveryChallan = {
   };
   product?: [
     {
-      product_id: Types.ObjectId;
+      product_id?: Types.ObjectId;
+      product_name?: string;
+      description?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -45,7 +48,8 @@ export type TDeliveryChallan = {
   ];
   service?: [
     {
-      service_id: Types.ObjectId;
+      service_id?: Types.ObjectId;
+      service_name?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -58,14 +62,17 @@ export type TDeliveryChallan = {
   notes?: string;
   internal_notes?: string;
   Attachment?: string;
+  /** Captured customer signature image path. */
+  signature?: string;
   sub_total: number;
   deposit: number | string;
   discount: number | string;
   shipping_cost: number | string;
   inline_discount: number;
   tax: number;
+  tax_breakdown?: { name: string; rate: number; base: number; amount: number }[];
   total: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

@@ -3,6 +3,10 @@ import catchAsync from "../../../../utils/catchAsync";
 import sendResponse from "../../../../utils/sendResponse";
 import { AuthRequest } from "../../../../middlewares/auth";
 import { taxService } from "./tax.service";
+import { ActivityAction } from "../../activities/activities.interface";
+import { activitiesService } from "../../activities/activities.service";
+import { ActivityModule } from "../../../../utils/activityModules";
+import { activityActors } from "../../../../utils/activityContext";
 
 const createTax = catchAsync(async (req: AuthRequest, res) => {
   req.body.user_id = req.user?._id;
@@ -13,10 +17,17 @@ const createTax = catchAsync(async (req: AuthRequest, res) => {
     message: "Tax created successfully.",
     data: result,
   });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.tax,
+    entity_ids: [result._id!],
+    action: ActivityAction.created,
+    title: `Tax ${result.name} Created`,
+  });
 });
 
 const getAllTax = catchAsync(async (req: AuthRequest, res) => {
-  const result = await taxService.getAllTaxDB(req?.user?._id as string);
+  const result = await taxService.getAllTaxDB(req?.user?._id as string, req.query);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -49,6 +60,13 @@ const updateTax = catchAsync(async (req: AuthRequest, res) => {
     message: "Tax updated successfully.",
     data: result,
   });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.tax,
+    entity_ids: [result?._id ?? id],
+    action: ActivityAction.updated,
+    title: `Tax ${result?.name ?? id} Updated`,
+  });
 });
 
 const deleteTax = catchAsync(async (req: AuthRequest, res) => {
@@ -61,6 +79,13 @@ const deleteTax = catchAsync(async (req: AuthRequest, res) => {
     statusCode: httpStatus.OK,
     message: "Tax deleted successfully.",
     data: result,
+  });
+  await activitiesService.activitiesCreateDB({
+    ...activityActors(req),
+    module: ActivityModule.tax,
+    entity_ids: [result?._id ?? id],
+    action: ActivityAction.archived,
+    title: `Tax ${result?.name ?? id} Deleted`,
   });
 });
 

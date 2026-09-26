@@ -1,7 +1,7 @@
 import moment from "moment";
 import { Types } from "mongoose";
 import { UserModel } from "../../basic_modules/user/user.model";
-import { role } from "../../../utils/role";
+import { role, CUSTOMER_ROLE_SET } from "../../../utils/role";
 import {
   BugStageModel,
   ProjectBugModel,
@@ -65,7 +65,7 @@ const companyDashboard = async (userId: string) => {
   });
   const totalClients = await UserModel.countDocuments({
     companyId: userId,
-    role: role.customer,
+    role: { $in: [...CUSTOMER_ROLE_SET] },
     isDeleted: false,
   });
 

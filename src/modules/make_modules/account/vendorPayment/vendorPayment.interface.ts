@@ -21,8 +21,11 @@ export type TVendorPayment = {
   bank_account_id: Types.ObjectId;
   reference_number?: string;
   payment_amount: number;
+  payment_method?: string[];
   status: (typeof paymentStatuses)[number];
   notes?: string;
+  /** Uploaded file path from POST /api/v1/upload. */
+  attachments?: string;
   allocations?: TVendorPaymentAllocation[];
   debit_notes?: TDebitNoteApplication[];
   isDeleted?: boolean;

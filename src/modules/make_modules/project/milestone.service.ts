@@ -10,6 +10,7 @@ import {
 } from "./project.utils";
 import { Types } from "mongoose";
 import { TMilestoneStatus } from "./project.interface";
+import { withBulkDeleteIdSecond } from "../../../utils/bulkDelete";
 
 const create = async (userId: string, body: Record<string, unknown>) => {
   await assertProject(String(body.project_id), userId);
@@ -31,7 +32,6 @@ const update = async (userId: string, body: Record<string, unknown>) => {
   const milestone = await ProjectMilestoneModel.findOne({
     _id: body.milestone_id,
     user_id: userId,
-    isDeleted: false,
   });
   if (!milestone) throw new AppError(httpStatus.NOT_FOUND, "Milestone not found");
   if (body.title !== undefined) milestone.title = String(body.title);
@@ -45,7 +45,7 @@ const update = async (userId: string, body: Record<string, unknown>) => {
   return formatProjectResponse(milestone);
 };
 
-const remove = async (userId: string, milestoneId: string) => {
+const removeOne = async (userId: string, milestoneId: string) => {
   const milestone = await ProjectMilestoneModel.findOneAndUpdate(
     { _id: milestoneId, user_id: userId, isDeleted: false },
     { isDeleted: true },
@@ -75,5 +75,7 @@ const listByProject = async (userId: string, projectId: string) => {
     }))
   );
 };
+
+const remove = withBulkDeleteIdSecond(removeOne);
 
 export const milestoneService = { create, update, remove, listByProject };

@@ -41,4 +41,11 @@ router.delete(
   invoiceReturnController.deleteReturn
 );
 
+// `delete` is a soft delete, so a trashed invoice return can be brought back.
+router.post(
+  "/restore/:id",
+  authMiddleware(role.company),
+  invoiceReturnController.restoreReturn
+);
+
 export const invoiceReturnRoutes = router;

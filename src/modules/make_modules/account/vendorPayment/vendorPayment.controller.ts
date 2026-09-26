@@ -17,6 +17,18 @@ const create = catchAsync(async (req: AuthRequest, res) => {
   });
 });
 
+const record = catchAsync(async (req: AuthRequest, res) => {
+  applyCompanyUserToBody(req);
+  req.body.creator_id = creatorId(req);
+  const data = await vendorPaymentService.recordDB(req.body);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.CREATED,
+    message: "Vendor payment recorded successfully",
+    data,
+  });
+});
+
 const getAll = catchAsync(async (req: AuthRequest, res) => {
   const result = await vendorPaymentService.getAllDB(req.user!._id as string, req.query);
   sendResponse(res, {
@@ -25,6 +37,19 @@ const getAll = catchAsync(async (req: AuthRequest, res) => {
     message: "Vendor payments retrieved successfully",
     data: result.rows,
     pagination: result.pagination,
+  });
+});
+
+const getSingle = catchAsync(async (req: AuthRequest, res) => {
+  const data = await vendorPaymentService.getSingleDB(
+    req.params.id,
+    req.user!._id as string
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Vendor payment retrieved successfully",
+    data,
   });
 });
 
@@ -67,7 +92,9 @@ const remove = catchAsync(async (req: AuthRequest, res) => {
 
 export const vendorPaymentController = {
   create,
+  record,
   getAll,
+  getSingle,
   getOutstanding,
   updateStatus,
   remove,

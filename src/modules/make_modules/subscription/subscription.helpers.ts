@@ -40,16 +40,48 @@ export const getActiveSubscription = async (
   if (!sub) {
     return { exists: false, expired: false, modules: [], limits: {}, number_of_users: UNLIMITED, raw: null };
   }
-  const expired =
-    sub.status === "expired" ||
-    sub.status === "cancelled" ||
-    Boolean(sub.end_date && new Date() > new Date(sub.end_date));
+  const periodEnded = Boolean(sub.end_date && new Date() > new Date(sub.end_date));
+  // Cancelled mid-period still has access until end_date (cancel = stop auto-renew).
+  const expired = sub.status === "expired" || periodEnded;
+  // If the period already ended after a cancel, flip status for clarity (best-effort).
+  if (periodEnded && sub.status === "cancelled") {
+    /* leave as-is — expired flag already true for guards */
+  } else if (periodEnded && sub.status === "active" && sub.auto_renew === false) {
+    void CompanySubscriptionModel.updateOne(
+      { _id: sub._id },
+      { $set: { status: "expired" } },
+    ).catch(() => undefined);
+  }
   return {
     exists: true,
     expired,
     modules: sub.modules ?? [],
     limits: toPlainLimits(sub.limits),
     number_of_users: sub.number_of_users ?? UNLIMITED,
-    raw: sub,
+    raw: {
+      ...sub,
+      auto_renew: sub.auto_renew !== false,
+      cancel_at_period_end: sub.auto_renew === false || sub.status === "cancelled",
+    },
   };
+};
+
+/** Cancel auto-renew: keep access until end_date, then expire. */
+export const cancelCompanySubscription = async (companyId: string | Types.ObjectId) => {
+  const sub = await CompanySubscriptionModel.findOne({ company_id: companyId });
+  if (!sub) throw new AppError(httpStatus.NOT_FOUND, "No subscription found to cancel.");
+
+  const periodEnded = Boolean(sub.end_date && new Date() > new Date(sub.end_date));
+  if (sub.status === "expired" || periodEnded) {
+    throw new AppError(httpStatus.BAD_REQUEST, "This subscription is already expired.");
+  }
+  if (sub.auto_renew === false || sub.status === "cancelled") {
+    throw new AppError(httpStatus.BAD_REQUEST, "Subscription auto-renew is already cancelled.");
+  }
+
+  sub.auto_renew = false;
+  sub.status = "cancelled";
+  sub.cancelled_at = new Date();
+  await sub.save();
+  return sub;
 };

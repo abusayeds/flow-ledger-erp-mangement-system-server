@@ -14,6 +14,7 @@ router.post("/register",  userController.registerUser,);
 router.post("/verify-otp", userController.verifyOTP);
 router.post("/login", userController.loginUser);
 router.post("/google-login", userController.googleLogin);
+router.get("/login-presets", userController.loginPresets);
 router.post("/forgot-password", userController.forgotPassword);
 router.post("/verify-forgot-otp", userController.verifyForgotPasswordOTP);
 router.post("/resend", userController.resendOTP);

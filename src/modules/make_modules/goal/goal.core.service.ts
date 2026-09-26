@@ -247,13 +247,12 @@ export const updateGoalTracking = async (
   userId: string,
   creatorId?: Types.ObjectId
 ) => {
-  const goal = await GoalModel.findOne({ _id: goalId, ...companyScope(userId), isDeleted: false });
+  const goal = await GoalModel.findOne({ _id: goalId, ...companyScope(userId) });
   if (!goal) throw new AppError(httpStatus.NOT_FOUND, "Goal not found");
 
   const previousTracking = await GoalTrackingModel.findOne({
     goal_id: goalId,
-    ...companyScope(userId),
-    isDeleted: false,
+    ...companyScope(userId)
   })
     .sort({ tracking_date: -1 })
     .lean();
@@ -280,7 +279,7 @@ export const updateGoalTracking = async (
     progress_percentage: progressPercentage,
     days_remaining: daysRemaining,
     projected_completion_date: projectedDate,
-    on_track_status: "on_track",
+    on_track_status: "on_track"
   });
 };
 

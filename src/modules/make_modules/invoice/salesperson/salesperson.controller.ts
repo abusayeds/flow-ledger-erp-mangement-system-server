@@ -16,7 +16,12 @@ const createSalesperson = catchAsync(async (req: AuthRequest, res) => {
 });
 
 const getAllSalesperson = catchAsync(async (req: AuthRequest, res) => {
-  const result = await salespersonService.getAllDB(req?.user?._id as string);
+  const searchTerm = typeof req.query.searchTerm === "string" ? req.query.searchTerm : "";
+  const status = typeof req.query.status === "string" ? req.query.status : "";
+  const result = await salespersonService.getAllDB(req?.user?._id as string, {
+    searchTerm,
+    status,
+  });
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,

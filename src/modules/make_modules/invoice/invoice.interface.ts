@@ -9,6 +9,7 @@ export type TInvoice = {
   _id?: Types.ObjectId;
   user_id: Types.ObjectId;
   customer_id?: Types.ObjectId;
+  customer_name?: string;
   warehouse_id?: Types.ObjectId;
   invoice_number?: string;
   currency?: string;
@@ -40,7 +41,9 @@ export type TInvoice = {
   };
   product?: [
     {
-      product_id: Types.ObjectId;
+      product_id?: Types.ObjectId;
+      product_name?: string;
+      description?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -50,7 +53,8 @@ export type TInvoice = {
   ];
   service?: [
     {
-      service_id: Types.ObjectId;
+      service_id?: Types.ObjectId;
+      service_name?: string;
       quantity: number;
       rate: number;
       tax: number;
@@ -63,16 +67,21 @@ export type TInvoice = {
   notes?: string;
   internal_notes?: string;
   Attachment?: string;
+  signature?: string;
   sub_total: number;
   deposit: number | string;
   discount: number | string;
   shipping_cost: number | string;
   inline_discount: number;
   tax: number;
+  // Named-tax rows for the summary / PDF: each tax with its rate, the base it
+  // applies to and the resulting amount. Computed client-side (the per-line
+  // `tax` is a single numeric rate with no name).
+  tax_breakdown?: { name: string; rate: number; base: number; amount: number }[];
   total: number;
   paid_amount?: number;
   balance_amount?: number;
   isDeleted: boolean;
-  archive: boolean;
+  isArchive: boolean;
   createdAt?: Date;
 };

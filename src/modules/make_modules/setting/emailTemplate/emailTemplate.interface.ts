@@ -27,6 +27,7 @@ export const emailTemplateTypes = [
   "purchase_order",
   "bill",
   "debit_note",
+  "expense",
   "payment_made",
   "statement",
   "payment_reminder",
