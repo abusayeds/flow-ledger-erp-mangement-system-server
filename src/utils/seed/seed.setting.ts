@@ -55,6 +55,16 @@ export const setting_seed_data = {
     send_via: "Moon Invoice",
   },
 
+  // "" = use the Appearance (light/dark) default color for that area.
+  theme: {
+    button_color: "",
+    navbar_bg: "",
+    sidebar_bg: "",
+    sidebar_active: "",
+    list_sidebar_bg: "",
+    layout_bg: "",
+  },
+
   notification: {
     timezone: "(GMT-7:00) America/Los_Angeles",
     notification_time: "07:00",

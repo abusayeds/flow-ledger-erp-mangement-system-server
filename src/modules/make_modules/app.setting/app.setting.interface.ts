@@ -8,6 +8,7 @@ export type TSettingType =
   | "security"
   | "titles"
   | "whatsApp"
+  | "theme"
   | "notification"
   | "invoice"
   | "proforma_invoice"
@@ -98,6 +99,17 @@ export type TDocPayment = {
   cash_received_denomination?: boolean;
 };
 
+export const THEME_COLOR_KEYS = [
+  "button_color",
+  "navbar_bg",
+  "sidebar_bg",
+  "sidebar_active",
+  "list_sidebar_bg",
+  "layout_bg",
+] as const;
+export type TThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
+export type TThemeColors = Partial<Record<TThemeColorKey, string>>;
+
 export type TDocumentConfig = {
   field_visibility?: TDocFieldVisibility;
   general?: {
@@ -149,6 +161,9 @@ export type TSetting = {
     enabled?: boolean;
     send_via?: string;
   };
+
+  /** Custom UI colors (App Settings → Theme). "#rrggbb", or "" = theme default. */
+  theme?: TThemeColors;
 
   /** Reminder / recurring notification preferences (Notification Settings UI). */
   notification?: {
